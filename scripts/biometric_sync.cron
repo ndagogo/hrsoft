@@ -1,0 +1,8 @@
+# Example crontab entry for pull-mode biometric sync.
+# Edit the paths below to match your deployment, then install with: crontab -e
+#
+# Runs every minute. Adjust the schedule to match
+# BIOMETRIC_SETTINGS["PULL_POLL_INTERVAL_SECONDS"] in config/settings.py
+# (default 60s) if you change it there.
+
+* * * * * cd /path/to/hrms_project && /path/to/venv/bin/python manage.py sync_biometric_devices >> logs/biometric_sync.log 2>&1

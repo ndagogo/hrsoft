@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}My Leave{% endblock %}
+{% block page_title %}My Leave{% endblock %}
+{% block page_subtitle %}{{ balance }} day{{ balance|pluralize }} remaining this year{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+  <div>
+    <h2 class="section-heading">Leave requests</h2>
+    <p class="section-subtext mb-0">Nominate a stand-in → they accept → HOD → HR → General Manager → approval letter.</p>
+  </div>
+  <button class="btn btn-amber" data-bs-toggle="modal" data-bs-target="#newLeaveModal"><i class="bi bi-calendar-plus me-1"></i>Request Leave</button>
+</div>
+
+<div class="surface-card">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Type</th><th>Dates</th><th>Days</th><th>Stand-in</th><th>Status</th><th>Progress</th><th class="text-end">Action</th></tr></thead>
+      <tbody>
+      {% for lr in requests %}
+        <tr>
+          <td><span class="chip" style="background:{{ lr.leave_type.color }}1A; color:{{ lr.leave_type.color }};">{{ lr.leave_type.name }}</span></td>
+          <td>{{ lr.start_date|date:"M d" }} – {{ lr.end_date|date:"M d, Y" }}</td>
+          <td>{{ lr.days_requested }}</td>
+          <td class="small">{{ lr.stand_in_employee.full_name|default:"—" }}</td>
+          <td><span class="status-pill status-{{ lr.status }}">{{ lr.status_label }}</span></td>
+          <td>
+            <div class="leave-mini-track">
+              {% if lr.stand_in_accepted %}<span class="leave-mini-dot status-approved" title="Stand-in accepted"></span><span class="leave-mini-line"></span>{% elif lr.status == 'awaiting_standin' %}<span class="leave-mini-dot status-pending" title="Stand-in pending"></span><span class="leave-mini-line"></span>{% endif %}
+              {% for step in lr.approval_steps.all %}
+              <span class="leave-mini-dot status-{{ step.status }}" title="{{ step.get_stage_display }}: {{ step.get_status_display }}"></span>
+              {% if not forloop.last %}<span class="leave-mini-line"></span>{% endif %}
+              {% endfor %}
+            </div>
+          </td>
+          <td class="text-end">
+            <a href="{% url 'leave:detail' lr.pk %}" class="btn btn-sm btn-light">Timeline</a>
+            {% if lr.status == "approved" %}
+            <a href="{% url 'leave:letter' lr.pk %}" class="btn btn-sm btn-light"><i class="bi bi-download"></i></a>
+            {% endif %}
+            {% if lr.status == "pending" or lr.status == "awaiting_standin" %}
+            <form method="post" action="{% url 'leave:cancel' lr.pk %}" class="d-inline" onsubmit="return confirm('Cancel this leave request?');">
+              {% csrf_token %}<button class="btn btn-sm btn-outline-danger">Cancel</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7"><div class="empty-state"><i class="bi bi-calendar2-event"></i>You haven't requested any leave yet.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="newLeaveModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title font-display">Request leave</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">{{ modal_html|safe }}</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

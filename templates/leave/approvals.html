@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Leave Approvals{% endblock %}
+{% block page_title %}Leave Approvals{% endblock %}
+{% block page_subtitle %}
+  Requests awaiting your action
+  {% if is_hr and is_gm %}· HR & GM{% elif is_hr %}· HR stage{% elif is_gm %}· GM stage{% else %}· HOD / Supervisor stage{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="alert alert-light border mb-4 py-2" style="font-size:0.85rem;">
+  <i class="bi bi-info-circle me-1"></i>
+  Workflow: <strong>Employee → Stand-in accepts → HOD → HR → General Manager</strong>.
+  You only see requests at your stage{% if not is_hr and not is_gm %} and only for your department{% endif %}.
+  Stand-in must be accepted before you can approve.
+</div>
+
+<div class="surface-card mb-4">
+  <div class="surface-card-header"><h3 class="surface-card-title">Awaiting your decision</h3></div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Employee</th><th>Dept</th><th>Type</th><th>Dates</th><th>Stand-in</th><th>Stage</th><th class="text-end">Decision</th></tr></thead>
+      <tbody>
+      {% for lr in page_obj %}
+        <tr id="leave-row-{{ lr.pk }}">
+          <td>
+            <div class="fw-semibold" style="font-size:0.85rem;">{{ lr.employee.full_name }}</div>
+            <div class="text-secondary" style="font-size:0.74rem;">{{ lr.employee.employee_id }}</div>
+          </td>
+          <td>{{ lr.employee.department.name|default:"—" }}</td>
+          <td><span class="chip" style="background:{{ lr.leave_type.color }}1A; color:{{ lr.leave_type.color }};">{{ lr.leave_type.name }}</span></td>
+          <td>{{ lr.start_date|date:"M j" }} – {{ lr.end_date|date:"M j" }} · {{ lr.days_requested }}d</td>
+          <td class="small">
+            {{ lr.stand_in_employee.full_name|default:"—" }}
+            {% if lr.stand_in_accepted %}<span class="text-success">✓</span>{% endif %}
+          </td>
+          <td><span class="status-pill status-pending">{{ lr.get_current_stage_display }}</span></td>
+          <td class="text-end">
+            <a href="{% url 'leave:detail' lr.pk %}" class="btn btn-sm btn-light">Timeline</a>
+            <button class="btn btn-sm btn-amber" data-modal-url="{% url 'leave:review' lr.pk %}" data-modal-title="Review leave request"><i class="bi bi-clipboard-check me-1"></i>Review</button>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7"><div class="empty-state"><i class="bi bi-clipboard-check"></i>No leave requests awaiting your action.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page_obj.has_other_pages %}
+  <div class="surface-card-body border-top">
+    <nav><ul class="pagination mb-0 justify-content-center">
+      {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>{% endif %}
+      <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+      {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a></li>{% endif %}
+    </ul></nav>
+  </div>
+  {% endif %}
+</div>
+
+<div class="surface-card">
+  <div class="surface-card-header"><h3 class="surface-card-title">Recent decisions in your scope</h3></div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Employee</th><th>Type</th><th>Dates</th><th>Final status</th><th>Closed by</th></tr></thead>
+      <tbody>
+      {% for lr in history %}
+        <tr>
+          <td><a href="{% url 'leave:detail' lr.pk %}" class="text-decoration-none">{{ lr.employee.full_name }}</a></td>
+          <td>{{ lr.leave_type.name }}</td>
+          <td>{{ lr.start_date|date:"M j" }} – {{ lr.end_date|date:"M j, Y" }}</td>
+          <td><span class="status-pill status-{{ lr.status }}">{{ lr.get_status_display }}</span></td>
+          <td class="text-secondary" style="font-size:0.8rem;">{% if lr.reviewed_by %}{{ lr.reviewed_by.get_full_name|default:lr.reviewed_by.username }}{% else %}—{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5"><div class="empty-state py-3"><i class="bi bi-clock-history"></i>No decisions yet.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

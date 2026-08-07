@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == "edit" %}Edit Employee{% else %}Add Employee{% endif %}{% endblock %}
+{% block page_title %}{% if mode == "edit" %}Edit Employee{% else %}Add Employee{% endif %}{% endblock %}
+
+{% block content %}
+<div class="surface-card" style="max-width: 900px;">
+  <div class="surface-card-body">
+    {% include "employees/_form_modal_body.html" %}
+  </div>
+</div>
+{% endblock %}

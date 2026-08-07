@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Leave #{{ leave_request.pk }}{% endblock %}
+{% block page_title %}Leave request timeline{% endblock %}
+{% block page_subtitle %}{{ leave_request.leave_type.name }} · {{ leave_request.start_date|date:"M d" }} – {{ leave_request.end_date|date:"M d, Y" }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between mb-4 flex-wrap gap-2">
+  <a href="{% if is_owner %}{% url 'leave:my_requests' %}{% else %}{% url 'leave:approvals' %}{% endif %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if can_download %}
+    <a href="{% url 'leave:letter' leave_request.pk %}" class="btn btn-primary btn-sm"><i class="bi bi-file-earmark-pdf me-1"></i>Download approval letter</a>
+    {% endif %}
+    {% if show_renominate %}
+    <a href="{% url 'leave:renominate' leave_request.pk %}" class="btn btn-amber btn-sm">Select another stand-in</a>
+    {% endif %}
+    {% if can_review %}
+    <button class="btn btn-amber btn-sm" data-modal-url="{% url 'leave:review' leave_request.pk %}" data-modal-title="Review leave request"><i class="bi bi-clipboard-check me-1"></i>Review now</button>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="surface-card h-100">
+      <div class="surface-card-header"><h3 class="surface-card-title">Request details</h3></div>
+      <div class="surface-card-body" style="font-size:0.9rem;">
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Employee</span><span class="fw-semibold">{{ leave_request.employee.full_name }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Department</span><span class="fw-semibold">{{ leave_request.employee.department.name|default:"—" }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Type</span><span class="fw-semibold">{{ leave_request.leave_type.name }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Days</span><span class="fw-semibold">{{ leave_request.days_requested }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Resumption</span><span class="fw-semibold">{{ leave_request.resumption_date|date:"M d, Y" }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Stand-in</span><span class="fw-semibold">{{ leave_request.stand_in_employee.full_name|default:"—" }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Overall status</span><span class="status-pill status-{{ leave_request.status }}">{{ leave_request.status_label }}</span></div>
+        <hr>
+        <div class="text-secondary small mb-1">Reason</div>
+        <div>{{ leave_request.reason }}</div>
+        {% if leave_request.handover_notes %}
+        <div class="text-secondary small mb-1 mt-3">Handover notes</div>
+        <div>{{ leave_request.handover_notes|linebreaksbr }}</div>
+        {% endif %}
+        <div class="text-secondary mt-3" style="font-size:0.76rem;">Submitted {{ leave_request.created_at|date:"M d, Y H:i" }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="surface-card h-100">
+      <div class="surface-card-header"><h3 class="surface-card-title">Approval timeline</h3></div>
+      <div class="surface-card-body">
+        <ol class="leave-timeline">
+          <li class="leave-timeline-item done">
+            <div class="leave-timeline-marker"><i class="bi bi-person-check"></i></div>
+            <div class="leave-timeline-body">
+              <div class="fw-semibold">Submitted by employee</div>
+              <div class="text-secondary small">{{ leave_request.employee.full_name }} · {{ leave_request.created_at|date:"M d, Y H:i" }}</div>
+            </div>
+          </li>
+          {% with sir=leave_request.active_stand_in_request %}
+          <li class="leave-timeline-item {% if leave_request.stand_in_accepted %}done{% elif sir and sir.status == 'declined' %}rejected{% elif sir %}pending{% else %}waiting{% endif %}">
+            <div class="leave-timeline-marker">
+              {% if leave_request.stand_in_accepted %}<i class="bi bi-check-lg"></i>
+              {% elif sir and sir.status == 'declined' %}<i class="bi bi-x-lg"></i>
+              {% else %}<i class="bi bi-person-plus"></i>{% endif %}
+            </div>
+            <div class="leave-timeline-body">
+              <div class="d-flex justify-content-between gap-2 flex-wrap">
+                <div class="fw-semibold">Stand-in coverage</div>
+                {% if leave_request.stand_in_accepted %}
+                <span class="status-pill status-approved">Accepted</span>
+                {% elif sir %}
+                <span class="status-pill status-{{ sir.status }}">{{ sir.get_status_display }}</span>
+                {% endif %}
+              </div>
+              <div class="text-secondary small mt-1">
+                {{ leave_request.stand_in_employee.full_name|default:"Not nominated" }}
+                {% if sir and sir.responded_at %} · {{ sir.responded_at|date:"M d, Y H:i" }}{% endif %}
+              </div>
+              {% if sir and sir.remarks %}<div class="small mt-1">Remarks: {{ sir.remarks }}</div>{% endif %}
+            </div>
+          </li>
+          {% endwith %}
+          {% for step in leave_request.approval_steps.all %}
+          <li class="leave-timeline-item {{ step.status }}">
+            <div class="leave-timeline-marker">
+              {% if step.status == 'approved' %}<i class="bi bi-check-lg"></i>
+              {% elif step.status == 'rejected' %}<i class="bi bi-x-lg"></i>
+              {% elif step.status == 'pending' %}<i class="bi bi-hourglass-split"></i>
+              {% else %}<i class="bi bi-circle"></i>{% endif %}
+            </div>
+            <div class="leave-timeline-body">
+              <div class="d-flex justify-content-between gap-2 flex-wrap">
+                <div class="fw-semibold">{{ step.get_stage_display }}</div>
+                <span class="status-pill status-{{ step.status }}">{{ step.get_status_display }}</span>
+              </div>
+              {% if step.acted_by %}
+              <div class="text-secondary small mt-1">
+                {{ step.acted_by.get_full_name|default:step.acted_by.username }}
+                {% if step.acted_at %} · {{ step.acted_at|date:"M d, Y H:i" }}{% endif %}
+              </div>
+              {% elif step.status == 'pending' %}
+              <div class="text-secondary small mt-1">Awaiting action</div>
+              {% elif step.status == 'waiting' %}
+              <div class="text-secondary small mt-1">Queued — unlocks after previous approval</div>
+              {% endif %}
+              {% if step.note %}<div class="small mt-1">Note: {{ step.note }}</div>{% endif %}
+            </div>
+          </li>
+          {% endfor %}
+          {% if leave_request.status == 'approved' %}
+          <li class="leave-timeline-item done">
+            <div class="leave-timeline-marker"><i class="bi bi-flag-fill"></i></div>
+            <div class="leave-timeline-body">
+              <div class="fw-semibold">Fully approved</div>
+              <div class="text-secondary small">Leave balance updated · approval letter available</div>
+            </div>
+          </li>
+          {% endif %}
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

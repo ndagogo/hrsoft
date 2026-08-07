@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Pipeline{% endblock %}
+{% block page_title %}Hiring pipeline{% endblock %}
+{% block page_subtitle %}Kanban view of active candidates{% endblock %}
+{% block extra_css %}
+<style>
+  .pipe-board { display:flex; gap:12px; overflow-x:auto; padding-bottom:1rem; }
+  .pipe-col { min-width:220px; max-width:240px; background:rgba(15,39,68,.04); border-radius:12px; padding:10px; }
+  .pipe-col h4 { font-size:.75rem; text-transform:uppercase; letter-spacing:.04em; color:#64748b; margin:0 0 8px; }
+  .pipe-card { background:#fff; border:1px solid rgba(15,39,68,.08); border-radius:8px; padding:10px; margin-bottom:8px; font-size:.875rem; }
+  .pipe-card a { color:inherit; text-decoration:none; font-weight:600; }
+</style>
+{% endblock %}
+{% block content %}
+<form method="get" class="mb-3 d-flex gap-2">
+  <select name="vacancy" class="form-select form-select-sm" style="max-width:280px;" onchange="this.form.submit()">
+    <option value="">All open roles</option>
+    {% for v in vacancies %}<option value="{{ v.pk }}" {% if vacancy_filter == v.pk|stringformat:'s' %}selected{% endif %}>{{ v.title }}</option>{% endfor %}
+  </select>
+</form>
+<div class="pipe-board">
+  {% for col in columns %}
+  <div class="pipe-col">
+    <h4>{{ col.label }} <span class="badge text-bg-secondary">{{ col.items|length }}</span></h4>
+    {% for a in col.items %}
+    <div class="pipe-card">
+      <a href="{% url 'recruitment:application_detail' a.pk %}">{{ a.full_name }}</a>
+      <div class="small text-secondary">{{ a.vacancy.title }}</div>
+    </div>
+    {% empty %}
+    <div class="small text-secondary px-1">Empty</div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

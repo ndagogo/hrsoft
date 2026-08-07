@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+{% block title %}Organization{% endblock %}
+{% block page_title %}Organization Structure{% endblock %}
+{% block page_subtitle %}{{ companies|length }} companies · {{ branch_count }} branches · {{ region_count }} regions{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+  <div>
+    <h2 class="section-heading">Companies, regions &amp; branches</h2>
+    <p class="section-subtext mb-0">Define the organisational hierarchy used by employees, recruitment, assets and visitors.</p>
+  </div>
+  {% if can_manage %}
+  <div class="d-flex gap-2 flex-wrap">
+    <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#newUnitModal"><i class="bi bi-puzzle me-1"></i>New Unit</button>
+    <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#newRegionModal"><i class="bi bi-map me-1"></i>New Region</button>
+    <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#newBranchModal"><i class="bi bi-geo-alt me-1"></i>New Branch</button>
+    <button class="btn btn-amber" data-bs-toggle="modal" data-bs-target="#newCompanyModal"><i class="bi bi-building me-1"></i>New Company</button>
+  </div>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3">{% include "partials/_stat_card.html" with eyebrow="Companies" value=companies|length icon="bi-building" accent="ink" %}</div>
+  <div class="col-md-3">{% include "partials/_stat_card.html" with eyebrow="Regions" value=region_count icon="bi-map-fill" accent="violet" %}</div>
+  <div class="col-md-3">{% include "partials/_stat_card.html" with eyebrow="Branches" value=branch_count icon="bi-geo-alt-fill" accent="teal" %}</div>
+  <div class="col-md-3">{% include "partials/_stat_card.html" with eyebrow="Units" value=unit_count icon="bi-puzzle-fill" accent="amber" %}</div>
+</div>
+
+{# --- Companies --- #}
+<div class="surface-card mb-4">
+  <div class="surface-card-header"><h3 class="surface-card-title">Companies</h3></div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead>
+        <tr>
+          <th>Name</th><th>Code</th><th>Email</th><th>Phone</th><th>Status</th>
+          {% if can_manage %}<th class="text-end">Actions</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+      {% for c in companies %}
+        <tr>
+          <td class="fw-semibold">{{ c.name }}</td>
+          <td><span class="chip">{{ c.code }}</span></td>
+          <td>{{ c.email|default:"—" }}</td>
+          <td>{{ c.phone|default:"—" }}</td>
+          <td>{% if c.is_active %}<span class="chip">Active</span>{% else %}<span class="text-secondary">Inactive</span>{% endif %}</td>
+          {% if can_manage %}
+          <td class="text-end text-nowrap">
+            <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#editCompany{{ c.pk }}" title="Edit"><i class="bi bi-pencil"></i></button>
+            <form method="post" action="{% url 'organization:company_delete' c.pk %}" class="d-inline" onsubmit="return confirm('Delete company “{{ c.name }}”? This only works if it has no branches.');">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-light text-danger" title="Delete"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+      {% empty %}
+        <tr><td colspan="{% if can_manage %}6{% else %}5{% endif %}"><div class="empty-state"><i class="bi bi-building"></i>No companies yet.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# --- Regions & Branches --- #}
+<div class="row g-3 mb-4">
+  <div class="col-xl-5">
+    <div class="surface-card h-100">
+      <div class="surface-card-header"><h3 class="surface-card-title">Regions</h3></div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead>
+            <tr>
+              <th>Region</th><th>Code</th><th>Company</th>
+              {% if can_manage %}<th class="text-end">Actions</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+          {% for r in regions %}
+            <tr>
+              <td class="fw-semibold">{{ r.name }}</td>
+              <td><span class="chip">{{ r.code }}</span></td>
+              <td>{{ r.company.code }}</td>
+              {% if can_manage %}
+              <td class="text-end text-nowrap">
+                <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#editRegion{{ r.pk }}" title="Edit"><i class="bi bi-pencil"></i></button>
+                <form method="post" action="{% url 'organization:region_delete' r.pk %}" class="d-inline" onsubmit="return confirm('Delete region “{{ r.name }}”?');">
+                  {% csrf_token %}
+                  <button class="btn btn-sm btn-light text-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+          {% empty %}
+            <tr><td colspan="{% if can_manage %}4{% else %}3{% endif %}"><div class="empty-state"><i class="bi bi-map"></i>No regions yet.</div></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-7">
+    <div class="surface-card h-100">
+      <div class="surface-card-header"><h3 class="surface-card-title">Branches</h3></div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0 datatable">
+          <thead>
+            <tr>
+              <th>Branch</th><th>Code</th><th>City</th><th>Region</th><th>Company</th><th>Status</th>
+              {% if can_manage %}<th class="text-end">Actions</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+          {% for b in branches %}
+            <tr>
+              <td class="fw-semibold">{{ b.name }}{% if b.is_head_office %} <span class="chip">HQ</span>{% endif %}</td>
+              <td>{{ b.code }}</td>
+              <td>{{ b.city|default:"—" }}</td>
+              <td>{{ b.region.name|default:"—" }}</td>
+              <td>{{ b.company.code }}</td>
+              <td>{% if b.is_active %}<span class="chip">Active</span>{% else %}<span class="text-secondary">Inactive</span>{% endif %}</td>
+              {% if can_manage %}
+              <td class="text-end text-nowrap">
+                <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#editBranch{{ b.pk }}" title="Edit"><i class="bi bi-pencil"></i></button>
+                <form method="post" action="{% url 'organization:branch_delete' b.pk %}" class="d-inline" onsubmit="return confirm('Delete branch “{{ b.name }}”?');">
+                  {% csrf_token %}
+                  <button class="btn btn-sm btn-light text-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+          {% empty %}
+            <tr><td colspan="{% if can_manage %}7{% else %}6{% endif %}"><div class="empty-state"><i class="bi bi-geo-alt"></i>No branches yet.</div></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# --- Units --- #}
+<div class="surface-card mb-4">
+  <div class="surface-card-header"><h3 class="surface-card-title">Units</h3></div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead>
+        <tr>
+          <th>Unit</th><th>Department</th><th>Code</th>
+          {% if can_manage %}<th class="text-end">Actions</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+      {% for u in units %}
+        <tr>
+          <td class="fw-semibold">{{ u.name }}</td>
+          <td>{{ u.department.name }}</td>
+          <td><span class="chip">{{ u.code }}</span></td>
+          {% if can_manage %}
+          <td class="text-end text-nowrap">
+            <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#editUnit{{ u.pk }}" title="Edit"><i class="bi bi-pencil"></i></button>
+            <form method="post" action="{% url 'organization:unit_delete' u.pk %}" class="d-inline" onsubmit="return confirm('Delete unit “{{ u.name }}”?');">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-light text-danger" title="Delete"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+      {% empty %}
+        <tr><td colspan="{% if can_manage %}4{% else %}3{% endif %}"><div class="empty-state"><i class="bi bi-puzzle"></i>No units configured.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if can_manage %}
+{# ===== Create modals ===== #}
+<div class="modal fade" id="newCompanyModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <form method="post" action="{% url 'organization:company_create' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-header"><h5 class="modal-title font-display">New company</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-8"><label class="form-label small fw-semibold">Name</label>{{ company_form.name }}</div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Code</label>{{ company_form.code }}</div>
+            <div class="col-md-6"><label class="form-label small fw-semibold">Registration number</label>{{ company_form.registration_number }}</div>
+            <div class="col-md-6"><label class="form-label small fw-semibold">Tax ID</label>{{ company_form.tax_id }}</div>
+            <div class="col-12"><label class="form-label small fw-semibold">Address</label>{{ company_form.address }}</div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Phone</label>{{ company_form.phone }}</div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Email</label>{{ company_form.email }}</div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Website</label>{{ company_form.website }}</div>
+            <div class="col-md-8"><label class="form-label small fw-semibold">Logo</label>{{ company_form.logo }}</div>
+            <div class="col-md-4 d-flex align-items-end">
+              <div class="form-check mb-2">{{ company_form.is_active }} <label class="form-check-label" for="{{ company_form.is_active.id_for_label }}">Active</label></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-amber">Create company</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="newRegionModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'organization:region_create' %}">
+        {% csrf_token %}
+        <div class="modal-header"><h5 class="modal-title font-display">New region</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-3"><label class="form-label small fw-semibold">Company</label>{{ region_form.company }}</div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Name</label>{{ region_form.name }}</div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Code</label>{{ region_form.code }}</div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-amber">Create region</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="newBranchModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <form method="post" action="{% url 'organization:branch_create' %}">
+        {% csrf_token %}
+        <div class="modal-header"><h5 class="modal-title font-display">New branch</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label small fw-semibold">Company</label>{{ branch_form.company }}</div>
+            <div class="col-md-6"><label class="form-label small fw-semibold">Region</label>{{ branch_form.region }}</div>
+            <div class="col-md-8"><label class="form-label small fw-semibold">Name</label>{{ branch_form.name }}</div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Code</label>{{ branch_form.code }}</div>
+            <div class="col-12"><label class="form-label small fw-semibold">Address</label>{{ branch_form.address }}</div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">City</label>{{ branch_form.city }}</div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">State</label>{{ branch_form.state }}</div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Phone</label>{{ branch_form.phone }}</div>
+            <div class="col-md-6">
+              <div class="form-check">{{ branch_form.is_head_office }} <label class="form-check-label" for="{{ branch_form.is_head_office.id_for_label }}">Head office</label></div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-check">{{ branch_form.is_active }} <label class="form-check-label" for="{{ branch_form.is_active.id_for_label }}">Active</label></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-amber">Create branch</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="newUnitModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'organization:unit_create' %}">
+        {% csrf_token %}
+        <div class="modal-header"><h5 class="modal-title font-display">New unit</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-3"><label class="form-label small fw-semibold">Department</label>{{ unit_form.department }}</div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Name</label>{{ unit_form.name }}</div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Code</label>{{ unit_form.code }}</div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-amber">Create unit</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ===== Edit modals ===== #}
+{% for c in companies %}
+<div class="modal fade" id="editCompany{{ c.pk }}" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <form method="post" action="{% url 'organization:company_edit' c.pk %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-header"><h5 class="modal-title font-display">Edit company</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-8"><label class="form-label small fw-semibold">Name</label><input class="form-control" name="name" value="{{ c.name }}" required></div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Code</label><input class="form-control" name="code" value="{{ c.code }}" required></div>
+            <div class="col-md-6"><label class="form-label small fw-semibold">Registration number</label><input class="form-control" name="registration_number" value="{{ c.registration_number }}"></div>
+            <div class="col-md-6"><label class="form-label small fw-semibold">Tax ID</label><input class="form-control" name="tax_id" value="{{ c.tax_id }}"></div>
+            <div class="col-12"><label class="form-label small fw-semibold">Address</label><textarea class="form-control" name="address" rows="2">{{ c.address }}</textarea></div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Phone</label><input class="form-control" name="phone" value="{{ c.phone }}"></div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Email</label><input class="form-control" type="email" name="email" value="{{ c.email }}"></div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Website</label><input class="form-control" type="url" name="website" value="{{ c.website }}"></div>
+            <div class="col-md-8"><label class="form-label small fw-semibold">Logo</label><input class="form-control" type="file" name="logo" accept="image/*">{% if c.logo %}<div class="form-text">Current: {{ c.logo.name }}</div>{% endif %}</div>
+            <div class="col-md-4 d-flex align-items-end">
+              <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="is_active" id="editCompanyActive{{ c.pk }}" {% if c.is_active %}checked{% endif %}><label class="form-check-label" for="editCompanyActive{{ c.pk }}">Active</label></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-ink">Save changes</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{% for r in regions %}
+<div class="modal fade" id="editRegion{{ r.pk }}" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'organization:region_edit' r.pk %}">
+        {% csrf_token %}
+        <div class="modal-header"><h5 class="modal-title font-display">Edit region</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Company</label>
+            <select class="form-select" name="company" required>
+              {% for c in companies %}<option value="{{ c.pk }}" {% if r.company_id == c.pk %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Name</label><input class="form-control" name="name" value="{{ r.name }}" required></div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Code</label><input class="form-control" name="code" value="{{ r.code }}" required></div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-ink">Save changes</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{% for b in branches %}
+<div class="modal fade" id="editBranch{{ b.pk }}" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <form method="post" action="{% url 'organization:branch_edit' b.pk %}">
+        {% csrf_token %}
+        <div class="modal-header"><h5 class="modal-title font-display">Edit branch</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Company</label>
+              <select class="form-select" name="company" required>
+                {% for c in companies %}<option value="{{ c.pk }}" {% if b.company_id == c.pk %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Region</label>
+              <select class="form-select" name="region">
+                <option value="">— None —</option>
+                {% for r in regions %}<option value="{{ r.pk }}" {% if b.region_id == r.pk %}selected{% endif %}>{{ r.name }} ({{ r.company.code }})</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-md-8"><label class="form-label small fw-semibold">Name</label><input class="form-control" name="name" value="{{ b.name }}" required></div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Code</label><input class="form-control" name="code" value="{{ b.code }}" required></div>
+            <div class="col-12"><label class="form-label small fw-semibold">Address</label><textarea class="form-control" name="address" rows="2">{{ b.address }}</textarea></div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">City</label><input class="form-control" name="city" value="{{ b.city }}"></div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">State</label><input class="form-control" name="state" value="{{ b.state }}"></div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Phone</label><input class="form-control" name="phone" value="{{ b.phone }}"></div>
+            <div class="col-md-6">
+              <div class="form-check"><input class="form-check-input" type="checkbox" name="is_head_office" id="editBranchHQ{{ b.pk }}" {% if b.is_head_office %}checked{% endif %}><label class="form-check-label" for="editBranchHQ{{ b.pk }}">Head office</label></div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-check"><input class="form-check-input" type="checkbox" name="is_active" id="editBranchActive{{ b.pk }}" {% if b.is_active %}checked{% endif %}><label class="form-check-label" for="editBranchActive{{ b.pk }}">Active</label></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-ink">Save changes</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{% for u in units %}
+<div class="modal fade" id="editUnit{{ u.pk }}" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'organization:unit_edit' u.pk %}">
+        {% csrf_token %}
+        <div class="modal-header"><h5 class="modal-title font-display">Edit unit</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Department</label>
+            <select class="form-select" name="department" required>
+              {% for d in unit_form.fields.department.queryset %}<option value="{{ d.pk }}" {% if u.department_id == d.pk %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Name</label><input class="form-control" name="name" value="{{ u.name }}" required></div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Code</label><input class="form-control" name="code" value="{{ u.code }}" required></div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-ink">Save changes</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

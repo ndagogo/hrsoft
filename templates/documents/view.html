@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{{ document.title }}{% endblock %}
+{% block page_title %}{{ document.title }}{% endblock %}
+{% block page_subtitle %}{{ document.get_category_display }}{% if document.employee %} · {{ document.employee.full_name }}{% endif %}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <a href="javascript:history.back()" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+  <div class="d-flex gap-2">
+    <a href="{% url 'documents:download' document.pk %}" class="btn btn-sm btn-light"><i class="bi bi-download me-1"></i>Download</a>
+    <a href="{{ file_url }}" target="_blank" class="btn btn-sm btn-light"><i class="bi bi-box-arrow-up-right me-1"></i>Open raw</a>
+  </div>
+</div>
+
+<div class="surface-card">
+  <div class="surface-card-body">
+    {% if is_pdf %}
+    <iframe src="{{ file_url }}" title="{{ document.title }}" style="width:100%; min-height:75vh; border:0; border-radius:8px; background:#f8fafc;"></iframe>
+    {% elif is_image %}
+    <div class="text-center">
+      <img src="{{ file_url }}" alt="{{ document.title }}" class="img-fluid" style="max-height:75vh; border-radius:8px;">
+    </div>
+    {% elif is_text %}
+    <iframe src="{{ file_url }}" title="{{ document.title }}" style="width:100%; min-height:60vh; border:1px solid var(--border-soft); border-radius:8px;"></iframe>
+    {% else %}
+    <div class="empty-state py-5">
+      <i class="bi bi-file-earmark"></i>
+      <div class="mt-2">Preview is not available for this file type.</div>
+      <a href="{% url 'documents:download' document.pk %}" class="btn btn-amber btn-sm mt-3"><i class="bi bi-download me-1"></i>Download instead</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

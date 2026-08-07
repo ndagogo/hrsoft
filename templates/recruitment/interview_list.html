@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Interviews{% endblock %}
+{% block page_title %}Interviews{% endblock %}
+{% block page_subtitle %}Scheduled and completed interviews{% endblock %}
+{% block content %}
+<div class="mb-4 d-flex gap-2">
+  <a href="?show=upcoming" class="btn btn-sm {% if show == 'upcoming' %}btn-primary{% else %}btn-light{% endif %}">Upcoming</a>
+  <a href="?show=completed" class="btn btn-sm {% if show == 'completed' %}btn-primary{% else %}btn-light{% endif %}">Completed</a>
+  <a href="?show=all" class="btn btn-sm {% if show == 'all' %}btn-primary{% else %}btn-light{% endif %}">All</a>
+</div>
+<div class="surface-card">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0 datatable">
+      <thead><tr><th>Candidate</th><th>Role</th><th>Type</th><th>When</th><th>Panel</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for i in interviews %}
+      <tr>
+        <td><a href="{% url 'recruitment:interview_detail' i.pk %}">{{ i.application.full_name }}</a></td>
+        <td>{{ i.application.vacancy.title }}</td>
+        <td>{{ i.get_interview_type_display }}</td>
+        <td>{{ i.scheduled_at|date:"M d, Y H:i" }}</td>
+        <td class="small">{% for m in i.panel_members.all %}{{ m.get_full_name|default:m.username }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
+        <td>{% if i.completed %}<span class="status-pill status-hired">Done</span>{% else %}<span class="status-pill status-interview">Scheduled</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

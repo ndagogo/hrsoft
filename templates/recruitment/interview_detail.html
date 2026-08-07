@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Interview · {{ interview.application.full_name }}{% endblock %}
+{% block page_title %}Interview — {{ interview.application.full_name }}{% endblock %}
+{% block page_subtitle %}{{ interview.application.vacancy.title }} · Round {{ interview.round_number }} · {{ interview.get_interview_type_display }}{% endblock %}
+{% block content %}
+<div class="mb-4 d-flex gap-2">
+  <a href="{% url 'recruitment:interviews' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+  <a href="{% url 'recruitment:application_detail' interview.application_id %}" class="btn btn-outline-secondary btn-sm">Candidate</a>
+</div>
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="surface-card surface-card-body mb-3">
+      <div class="small mb-2"><span class="text-secondary">When</span><div class="fw-semibold">{{ interview.scheduled_at|date:"D, M d, Y · H:i" }} ({{ interview.duration_minutes }} min)</div></div>
+      <div class="small mb-2"><span class="text-secondary">Location</span><div>{{ interview.location|default:"—" }}</div></div>
+      <div class="small mb-2"><span class="text-secondary">Meeting link</span><div>{% if interview.meeting_link %}<a href="{{ interview.meeting_link }}" target="_blank">Join</a>{% else %}—{% endif %}</div></div>
+      <div class="small"><span class="text-secondary">Panel</span><div>{% for m in interview.panel_members.all %}{{ m.get_full_name|default:m.username }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</div></div>
+      {% if interview.notes %}<hr><p class="small mb-0" style="white-space:pre-wrap;">{{ interview.notes }}</p>{% endif %}
+    </div>
+    {% if can_manage %}
+    <div class="surface-card surface-card-body">
+      <h3 class="h6">Overall feedback</h3>
+      <form method="post" action="{% url 'recruitment:interview_feedback' interview.pk %}">{% csrf_token %}
+        {% for field in feedback_form %}<div class="mb-2"><label class="form-label small">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+        <button class="btn btn-primary btn-sm">Save feedback</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  <div class="col-lg-6">
+    <div class="surface-card surface-card-body mb-3">
+      <h3 class="h6">Your scorecard (1–5)</h3>
+      <form method="post" action="{% url 'recruitment:interview_scorecard' interview.pk %}">{% csrf_token %}
+        {% for field in scorecard_form %}<div class="mb-2"><label class="form-label small">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+        <button class="btn btn-outline-primary btn-sm">Submit scorecard</button>
+      </form>
+    </div>
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title">Submitted scorecards</h3></div>
+      <ul class="list-group list-group-flush">
+        {% for s in interview.scorecards.all %}
+        <li class="list-group-item small">
+          <strong>{{ s.reviewer.get_full_name|default:s.reviewer.username }}</strong> · avg {{ s.average_score }}
+          {% if s.recommendation %} · {{ s.get_recommendation_display }}{% endif %}
+          {% if s.comments %}<div class="text-secondary">{{ s.comments }}</div>{% endif %}
+        </li>
+        {% empty %}<li class="list-group-item small text-secondary">No scorecards yet</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

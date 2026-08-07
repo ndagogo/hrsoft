@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Attendance{% endblock %}
+{% block page_title %}Attendance Records{% endblock %}
+{% block page_subtitle %}Derived from biometric punches across all devices{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+  <div>
+    <h2 class="section-heading">Attendance report</h2>
+    <p class="section-subtext mb-0">Filter by staff, team, and period, then download enterprise-style attendance reports.</p>
+  </div>
+  {% if 'view_attendance' in perms_set %}
+  <div class="btn-group">
+    <button type="button" class="btn btn-light dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+      <i class="bi bi-download me-1"></i> Download report
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end">
+      <li><a class="dropdown-item" href="{% url 'attendance:export' %}?format=csv{% if selected_period %}&period={{ selected_period }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if selected_department %}&department={{ selected_department }}{% endif %}{% if selected_employee %}&employee={{ selected_employee }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}"><i class="bi bi-filetype-csv me-2"></i>CSV</a></li>
+      <li><a class="dropdown-item" href="{% url 'attendance:export' %}?format=xlsx{% if selected_period %}&period={{ selected_period }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if selected_department %}&department={{ selected_department }}{% endif %}{% if selected_employee %}&employee={{ selected_employee }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}"><i class="bi bi-file-earmark-excel me-2"></i>Excel</a></li>
+    </ul>
+  </div>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Present" value=stats.present icon="bi-check-circle-fill" accent="green" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Late" value=stats.late icon="bi-clock-fill" accent="amber" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Absent" value=stats.absent icon="bi-x-circle-fill" accent="rose" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Avg. hours worked" value=stats.avg_hours|floatformat:1 icon="bi-hourglass-split" accent="ink" %}</div>
+</div>
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Total records" value=stats.total_records icon="bi-table" accent="violet" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Staff covered" value=stats.staff_count icon="bi-people-fill" accent="teal" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Attendance rate" value=stats.attendance_rate|stringformat:".1f"|add:"%" icon="bi-graph-up-arrow" accent="green" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Late rate" value=stats.late_rate|stringformat:".1f"|add:"%" icon="bi-alarm" accent="amber" %}</div>
+</div>
+
+<div class="surface-card mb-4">
+  <div class="surface-card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Quick period</label>
+        <select name="period" class="form-select">
+          <option value="">Custom range</option>
+          <option value="today" {% if selected_period == "today" %}selected{% endif %}>Today</option>
+          <option value="last_7" {% if selected_period == "last_7" %}selected{% endif %}>Last 7 days</option>
+          <option value="last_30" {% if selected_period == "last_30" %}selected{% endif %}>Last 30 days</option>
+          <option value="this_month" {% if selected_period == "this_month" %}selected{% endif %}>This month</option>
+          <option value="last_month" {% if selected_period == "last_month" %}selected{% endif %}>Last month</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">From</label>
+        <input type="date" name="date_from" value="{{ date_from }}" class="form-control">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">To</label>
+        <input type="date" name="date_to" value="{{ date_to }}" class="form-control">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Department</label>
+        <select name="department" class="form-select">
+          <option value="">All departments</option>
+          {% for d in departments %}
+          <option value="{{ d.id }}" {% if selected_department == d.id|stringformat:"s" %}selected{% endif %}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold">Employee</label>
+        <select name="employee" class="form-select">
+          <option value="">All staff</option>
+          {% for e in employees %}
+          <option value="{{ e.id }}" {% if selected_employee == e.id|stringformat:"s" %}selected{% endif %}>{{ e.full_name }} ({{ e.employee_id }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Status</label>
+        <select name="status" class="form-select">
+          <option value="">Any status</option>
+          {% for value, label in status_choices %}
+          <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-ink w-100"><i class="bi bi-funnel me-1"></i>Filter</button>
+      </div>
+      <div class="col-md-1">
+        <a href="{% url 'attendance:list' %}" class="btn btn-light w-100" title="Reset filters"><i class="bi bi-arrow-counterclockwise"></i></a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="surface-card mb-4">
+  <div class="surface-card-header"><h3 class="surface-card-title">Staff attendance summary (selected period)</h3></div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Staff</th><th>Present days</th><th>Late days</th><th>Absent days</th><th>Total hours</th><th>Avg. hours/day</th></tr></thead>
+      <tbody>
+      {% for row in employee_summary %}
+        <tr>
+          <td class="fw-semibold">{{ row.employee__user__first_name }} {{ row.employee__user__last_name }} <span class="text-secondary">({{ row.employee__employee_id }})</span></td>
+          <td>{{ row.present_days }}</td>
+          <td>{{ row.late_days }}</td>
+          <td>{{ row.absent_days }}</td>
+          <td>{{ row.total_hours|default:0|floatformat:1 }}</td>
+          <td>{{ row.avg_hours|default:0|floatformat:1 }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6"><div class="empty-state"><i class="bi bi-people"></i>No staff summary for this filter.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="surface-card">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead>
+        <tr><th>Employee</th><th>Date</th><th>Check in</th><th>Check out</th><th>Hours</th><th>Status</th><th>Source</th>{% if 'manage_attendance' in perms_set %}<th class="text-end">Action</th>{% endif %}</tr>
+      </thead>
+      <tbody>
+      {% for rec in page_obj %}
+        <tr>
+          <td>
+            <div class="fw-semibold" style="font-size:0.85rem;">{{ rec.employee.full_name }}</div>
+            <div class="text-secondary" style="font-size:0.74rem;">{{ rec.employee.department.name|default:"—" }}</div>
+          </td>
+          <td>{{ rec.date|date:"M d, Y" }}</td>
+          <td>{{ rec.check_in|date:"H:i"|default:"—" }}</td>
+          <td>{{ rec.check_out|date:"H:i"|default:"—" }}</td>
+          <td>{{ rec.worked_hours }}h</td>
+          <td><span class="status-pill status-{{ rec.status }}">{{ rec.get_status_display }}</span>{% if rec.is_manual_override %}<i class="bi bi-pencil-square ms-1 text-secondary" title="Manually overridden"></i>{% endif %}</td>
+          <td><span class="chip"><i class="bi bi-{{ rec.source }}"></i> {{ rec.get_source_display }}</span></td>
+          {% if 'manage_attendance' in perms_set %}
+          <td class="text-end"><button class="btn btn-sm btn-light" data-modal-url="{% url 'attendance:override' rec.pk %}?modal=1" data-modal-title="Adjust attendance"><i class="bi bi-pencil"></i></button></td>
+          {% endif %}
+        </tr>
+      {% empty %}
+        <tr><td colspan="8"><div class="empty-state"><i class="bi bi-calendar-check"></i>No attendance records for this filter.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page_obj.has_other_pages %}
+  <div class="surface-card-body border-top">
+    <nav><ul class="pagination mb-0 justify-content-center">
+      {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?{% if filter_query %}{{ filter_query }}&{% endif %}page={{ page_obj.previous_page_number }}">Previous</a></li>{% endif %}
+      <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+      {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?{% if filter_query %}{{ filter_query }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a></li>{% endif %}
+    </ul></nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

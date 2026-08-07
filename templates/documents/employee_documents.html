@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Documents — {{ employee.full_name }}{% endblock %}
+{% block page_title %}Employment documents{% endblock %}
+{% block page_subtitle %}{{ employee.full_name }} · {{ employee.employee_id }}{% endblock %}
+
+{% block content %}
+<div class="mb-4"><a href="{% url 'employees:detail' employee.pk %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Back to profile</a></div>
+<div class="row g-3">
+  <div class="col-lg-{% if can_manage %}7{% else %}12{% endif %}">
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title">On file</h3></div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Title</th><th>Category</th><th>Uploaded by</th><th>Date</th><th></th></tr></thead>
+          <tbody>
+          {% for d in documents %}
+            <tr>
+              <td class="fw-semibold">{{ d.title }}{% if d.is_confidential %} <i class="bi bi-lock-fill text-danger"></i>{% endif %}</td>
+              <td><span class="chip">{{ d.get_category_display }}</span></td>
+              <td class="small">{{ d.uploaded_by.get_full_name|default:d.uploaded_by.username|default:"—" }}</td>
+              <td>{{ d.created_at|date:"M d, Y" }}</td>
+              <td class="text-end">
+                {% if d.file %}
+                <a href="{% url 'documents:view' d.pk %}" class="btn btn-sm btn-light" title="View"><i class="bi bi-eye"></i></a>
+                <a href="{% url 'documents:download' d.pk %}" class="btn btn-sm btn-light" title="Download"><i class="bi bi-download"></i></a>
+                {% endif %}
+                {% if can_manage %}
+                <form method="post" action="{% url 'documents:delete' d.pk %}" class="d-inline" onsubmit="return confirm('Delete this document?');">
+                  {% csrf_token %}<button class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5"><div class="empty-state py-4"><i class="bi bi-folder"></i>No documents on file.</div></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% if can_manage %}
+  <div class="col-lg-5">
+    <div class="surface-card surface-card-body">
+      <h5 class="font-display fw-semibold mb-3">Upload for employee</h5>
+      <form method="post" enctype="multipart/form-data">{% csrf_token %}
+        <div class="mb-3"><label class="form-label small fw-semibold">Title</label>{{ form.title }}</div>
+        <div class="mb-3"><label class="form-label small fw-semibold">Category</label>{{ form.category }}</div>
+        <div class="mb-3"><label class="form-label small fw-semibold">File</label>{{ form.file }}</div>
+        <div class="mb-3"><label class="form-label small fw-semibold">Description</label>{{ form.description }}</div>
+        <div class="mb-3"><label class="form-label small fw-semibold">Expiry date</label>{{ form.expiry_date }}</div>
+        <div class="form-check mb-3">{{ form.is_confidential }} <label class="form-check-label small">Confidential</label></div>
+        <button type="submit" class="btn btn-amber w-100">Upload</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

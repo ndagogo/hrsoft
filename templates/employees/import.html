@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Import Employees{% endblock %}
+{% block page_title %}Import Employees{% endblock %}
+{% block page_subtitle %}Bulk upload staff records from CSV or Excel{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="surface-card">
+      <div class="surface-card-body">
+        <h2 class="section-heading h5 mb-3">Upload file</h2>
+        <p class="section-subtext">
+          Import employees from a <strong>.csv</strong> or <strong>.xlsx</strong> file.
+          Existing records are matched by <code>employee_id</code> or <code>username</code> and updated.
+          New users receive the default password below and must change it on first login.
+        </p>
+
+        <form method="post" enctype="multipart/form-data" class="mt-4">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Employee file</label>
+            <input type="file" name="file" class="form-control" accept=".csv,.xlsx" required>
+          </div>
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="submit" class="btn btn-amber">
+              <i class="bi bi-upload me-1"></i> Import employees
+            </button>
+            <a href="{% url 'employees:list' %}" class="btn btn-light">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="surface-card mb-4">
+      <div class="surface-card-body">
+        <h3 class="h6 fw-semibold mb-2">Download template</h3>
+        <p class="text-secondary small mb-3">Use the template to ensure column names match. An example row is included.</p>
+        <div class="d-flex gap-2 flex-wrap">
+          <a href="{% url 'employees:import_template' %}?format=csv" class="btn btn-sm btn-outline-dark">
+            <i class="bi bi-filetype-csv me-1"></i> CSV template
+          </a>
+          <a href="{% url 'employees:import_template' %}?format=xlsx" class="btn btn-sm btn-outline-dark">
+            <i class="bi bi-file-earmark-excel me-1"></i> Excel template
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="surface-card">
+      <div class="surface-card-body">
+        <h3 class="h6 fw-semibold mb-2">Import notes</h3>
+        <ul class="small text-secondary mb-0 ps-3">
+          <li>Required columns: <code>username</code>, <code>first_name</code>, <code>last_name</code>, <code>email</code>, <code>date_joined</code></li>
+          <li>New employees also need a valid <code>role</code> name (e.g. Employee)</li>
+          <li>Default password for new accounts: <code>{{ default_password }}</code></li>
+          <li>Department and designation are matched by name</li>
+          <li>Manager is matched by <code>manager_employee_id</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

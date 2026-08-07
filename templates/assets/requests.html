@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Asset Requests{% endblock %}
+{% block page_title %}Asset Requests{% endblock %}
+{% block page_subtitle %}Supervisor → IT → Store approval chain{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-4">
+  <a href="{% url 'assets:dashboard' %}" class="btn btn-light btn-sm">Dashboard</a>
+  <a href="{% url 'assets:request_create' %}" class="btn btn-primary btn-sm">New Request</a>
+</div>
+<div class="surface-card">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Employee</th><th>Title</th><th>Category</th><th>Status</th><th>Date</th><th></th></tr></thead>
+      <tbody>
+      {% for r in requests %}
+        <tr>
+          <td>{{ r.employee.full_name }}</td>
+          <td>{{ r.title }}</td>
+          <td>{{ r.category.name }}</td>
+          <td><span class="status-pill status-{{ r.status }}">{{ r.get_status_display }}</span></td>
+          <td>{{ r.created_at|date:"M d, Y" }}</td>
+          <td>
+            {% if can_manage and r.status == 'pending' %}
+            <form method="post" action="{% url 'assets:request_approve' r.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="stage" value="supervisor"><button class="btn btn-sm btn-light">Supervisor ✓</button></form>
+            {% elif can_manage and r.status == 'supervisor_approved' %}
+            <form method="post" action="{% url 'assets:request_approve' r.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="stage" value="it"><button class="btn btn-sm btn-light">IT ✓</button></form>
+            {% elif can_manage and r.status == 'it_approved' %}
+            <form method="post" action="{% url 'assets:request_approve' r.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="stage" value="store"><button class="btn btn-sm btn-light">Store ✓</button></form>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6"><div class="empty-state">No requests.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

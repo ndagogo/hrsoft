@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}REQ-{{ requisition.pk }}{% endblock %}
+{% block page_title %}{{ requisition.title }}{% endblock %}
+{% block page_subtitle %}Requisition REQ-{{ requisition.pk }} · {{ requisition.get_status_display }}{% endblock %}
+{% block content %}
+<div class="mb-4 d-flex flex-wrap gap-2">
+  <a href="{% url 'recruitment:requisitions' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+  {% if can_manage and requisition.status == 'draft' %}
+  <form method="post" action="{% url 'recruitment:requisition_submit' requisition.pk %}">{% csrf_token %}
+    <button class="btn btn-primary btn-sm">Submit to HR</button>
+  </form>
+  {% endif %}
+  {% if can_manage and requisition.status == 'approved' %}
+  <a href="{% url 'recruitment:vacancy_create' %}?requisition={{ requisition.pk }}" class="btn btn-primary btn-sm">Create vacancy</a>
+  {% endif %}
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="surface-card surface-card-body mb-3">
+      <div class="row g-3 small">
+        <div class="col-md-4"><div class="text-secondary">Department</div><div class="fw-semibold">{{ requisition.department.name|default:"—" }}</div></div>
+        <div class="col-md-4"><div class="text-secondary">Branch</div><div class="fw-semibold">{{ requisition.branch.name|default:"—" }}</div></div>
+        <div class="col-md-4"><div class="text-secondary">Positions</div><div class="fw-semibold">{{ requisition.positions }} · {{ requisition.get_employment_type_display }}</div></div>
+        <div class="col-md-4"><div class="text-secondary">Requested by</div><div class="fw-semibold">{{ requisition.requested_by.get_full_name|default:requisition.requested_by }}</div></div>
+        <div class="col-md-4"><div class="text-secondary">Target start</div><div class="fw-semibold">{{ requisition.target_start_date|date:"M d, Y"|default:"—" }}</div></div>
+        <div class="col-md-4"><div class="text-secondary">Budget</div><div class="fw-semibold">{% if requisition.min_salary %}{{ requisition.min_salary }}{% if requisition.max_salary %} – {{ requisition.max_salary }}{% endif %}{% else %}—{% endif %}</div></div>
+      </div>
+      <hr>
+      <h3 class="h6">Justification</h3>
+      <p style="white-space:pre-wrap;">{{ requisition.justification }}</p>
+      {% if requisition.job_description %}
+      <h3 class="h6">Job description</h3>
+      <p style="white-space:pre-wrap;">{{ requisition.job_description }}</p>
+      {% endif %}
+      {% if requisition.requirements %}
+      <h3 class="h6">Requirements</h3>
+      <p style="white-space:pre-wrap;">{{ requisition.requirements }}</p>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="surface-card surface-card-body">
+      <h3 class="h6">Approval trail</h3>
+      <ul class="list-unstyled small mb-3">
+        <li class="mb-2"><strong>HR:</strong> {% if requisition.hr_reviewed_at %}{{ requisition.hr_reviewed_by }} · {{ requisition.hr_reviewed_at|date:"M d" }}{% if requisition.hr_note %}<br><span class="text-secondary">{{ requisition.hr_note }}</span>{% endif %}{% else %}<span class="text-secondary">Pending</span>{% endif %}</li>
+        <li><strong>GM:</strong> {% if requisition.gm_reviewed_at %}{{ requisition.gm_reviewed_by }} · {{ requisition.gm_reviewed_at|date:"M d" }}{% if requisition.gm_note %}<br><span class="text-secondary">{{ requisition.gm_note }}</span>{% endif %}{% else %}<span class="text-secondary">Pending</span>{% endif %}</li>
+      </ul>
+      {% if can_manage and requisition.status == 'pending_hr' %}
+      <form method="post" action="{% url 'recruitment:requisition_hr' requisition.pk %}">{% csrf_token %}
+        {{ review_form.note }}
+        <div class="d-flex gap-2 mt-2">
+          <button name="action" value="approve" class="btn btn-success btn-sm">Approve → GM</button>
+          <button name="action" value="reject" class="btn btn-outline-danger btn-sm">Reject</button>
+        </div>
+      </form>
+      {% endif %}
+      {% if can_manage and requisition.status == 'pending_gm' %}
+      <form method="post" action="{% url 'recruitment:requisition_gm' requisition.pk %}">{% csrf_token %}
+        {{ review_form.note }}
+        <div class="d-flex gap-2 mt-2">
+          <button name="action" value="approve" class="btn btn-success btn-sm">Final approve</button>
+          <button name="action" value="reject" class="btn btn-outline-danger btn-sm">Reject</button>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

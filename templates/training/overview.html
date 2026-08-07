@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Training{% endblock %}
+{% block page_title %}Training & Development{% endblock %}
+{% block page_subtitle %}Courses, schedules & certifications{% endblock %}
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-md-4">{% include "partials/_stat_card.html" with eyebrow="Courses" value=courses|length icon="bi-mortarboard-fill" accent="ink" %}</div>
+  <div class="col-md-4">{% include "partials/_stat_card.html" with eyebrow="Schedules" value=schedules|length icon="bi-calendar-week-fill" accent="teal" %}</div>
+  <div class="col-md-4">{% include "partials/_stat_card.html" with eyebrow="Enrollments" value=enrollments|length icon="bi-people-fill" accent="amber" %}</div>
+</div>
+<div class="surface-card"><div class="surface-card-header"><h3 class="surface-card-title">Training Enrollments</h3></div>
+<div class="table-responsive"><table class="table table-hrms mb-0 datatable"><thead><tr><th>Employee</th><th>Course</th><th>Schedule</th><th>Status</th></tr></thead><tbody>
+{% for e in enrollments %}<tr><td>{{ e.employee.full_name }}</td><td>{{ e.schedule.course.title }}</td><td>{{ e.schedule.start_date|date:"M d" }} – {{ e.schedule.end_date|date:"M d, Y" }}</td><td><span class="status-pill status-{{ e.status }}">{{ e.get_status_display }}</span></td></tr>{% empty %}<tr><td colspan="4"><div class="empty-state"><i class="bi bi-mortarboard"></i>No enrollments.</div></td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}HR Dashboard{% endblock %}
+{% block page_title %}HR Manager Dashboard{% endblock %}
+{% block page_subtitle %}Workforce & leave overview · {% now "l, F j" %}{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Active Employees" value=total_employees icon="bi-people-fill" accent="ink" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Open Vacancies" value=open_vacancies icon="bi-briefcase-fill" accent="teal" subtext="Active recruitment" link="/recruitment/vacancies/?status=open" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Pending Leave" value=pending_leave icon="bi-hourglass-split" accent="amber" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="On Leave Today" value=on_leave_today icon="bi-calendar2-x-fill" accent="violet" %}</div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-xl-7">
+    <div class="surface-card h-100">
+      <div class="surface-card-header"><h3 class="surface-card-title">Attendance trend — last 14 days</h3></div>
+      <div class="surface-card-body"><canvas id="trendChart" height="110"></canvas></div>
+    </div>
+  </div>
+  <div class="col-xl-5">
+    <div class="surface-card h-100">
+      <div class="surface-card-header"><h3 class="surface-card-title">Approved leave by type</h3></div>
+      <div class="surface-card-body"><canvas id="leaveChart" height="180"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-12">
+    {% include "partials/_calendar_widget.html" with title="Team leave calendar" scope="team" calendar_id="hrCalendar" %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-xl-6">
+    <div class="surface-card h-100">
+      <div class="surface-card-header">
+        <h3 class="surface-card-title">Pending leave requests</h3>
+        <a href="{% url 'leave:approvals' %}" class="small">View all →</a>
+      </div>
+      <div class="surface-card-body p-0">
+        {% if pending_requests %}
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Employee</th><th>Type</th><th>Dates</th><th></th></tr></thead>
+          <tbody>
+          {% for lr in pending_requests %}
+            <tr>
+              <td>{{ lr.employee.full_name }}</td>
+              <td>{{ lr.leave_type.name }}</td>
+              <td>{{ lr.start_date|date:"M j" }} – {{ lr.end_date|date:"M j" }}</td>
+              <td class="text-end"><span class="status-pill status-pending">Pending</span></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state"><i class="bi bi-check2-circle"></i>No pending requests. You're all caught up.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="surface-card h-100">
+      <div class="surface-card-header"><h3 class="surface-card-title">Headcount by department</h3></div>
+      <div class="surface-card-body p-0">
+        <table class="table table-hrms mb-0">
+          <tbody>
+          {% for dept in headcount_by_dept %}
+            <tr>
+              <td>{{ dept.name }}</td>
+              <td class="text-end fw-semibold">{{ dept.count }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+new Chart(document.getElementById('trendChart'), {
+  type: 'bar',
+  data: {
+    labels: {{ trend_labels|safe }},
+    datasets: [
+      { label: 'Present', data: {{ trend_present|safe }}, backgroundColor: '#22c55e', borderRadius: 5, stack: 's' },
+      { label: 'Late', data: {{ trend_late|safe }}, backgroundColor: '#f5a524', borderRadius: 5, stack: 's' },
+      { label: 'Absent', data: {{ trend_absent|safe }}, backgroundColor: '#f43f5e', borderRadius: 5, stack: 's' },
+    ]
+  },
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f3f9' } }, x: { grid: { display: false } } } }
+});
+
+new Chart(document.getElementById('leaveChart'), {
+  type: 'pie',
+  data: { labels: {{ leave_labels|safe }}, datasets: [{ data: {{ leave_counts|safe }}, backgroundColor: ['#f5a524','#14b8a6','#8b5cf6','#f43f5e','#324269'], borderWidth: 0 }] },
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+});
+</script>
+{% endblock %}

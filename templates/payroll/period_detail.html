@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}{{ period.name }}{% endblock %}
+{% block page_title %}{{ period.name }}{% endblock %}
+{% block page_subtitle %}{{ period.start_date|date:"M d" }} – {{ period.end_date|date:"M d, Y" }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+  <a href="{% url 'payroll:periods' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>All periods</a>
+  {% if 'manage_payroll' in perms_set %}
+  <div class="d-flex gap-2 flex-wrap">
+    {% if period.can_run %}
+    <form method="post" action="{% url 'payroll:run' period.pk %}" data-confirm="Process payroll for this period?">
+      {% csrf_token %}
+      <button class="btn btn-ink"><i class="bi bi-arrow-repeat me-1"></i>{% if period.status == 'draft' %}Run payroll{% else %}Re-run payroll{% endif %}</button>
+    </form>
+    {% endif %}
+    {% if period.status == "processed" and period.approval_status == "not_submitted" and not period.is_locked %}
+    <form method="post" action="{% url 'payroll:submit_approval' period.pk %}">
+      {% csrf_token %}
+      <button class="btn btn-light"><i class="bi bi-send me-1"></i>Submit for approval</button>
+    </form>
+    {% endif %}
+    {% if period.approval_status == "pending" %}
+    <form method="post" action="{% url 'payroll:approve' period.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="approve">
+      <button class="btn btn-amber"><i class="bi bi-check-lg me-1"></i>Approve</button>
+    </form>
+    <form method="post" action="{% url 'payroll:approve' period.pk %}" data-confirm="Reject this payroll submission?">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="reject">
+      <button class="btn btn-light text-danger"><i class="bi bi-x-lg me-1"></i>Reject</button>
+    </form>
+    {% endif %}
+    {% if period.approval_status == "approved" and not period.is_locked %}
+    <form method="post" action="{% url 'payroll:lock' period.pk %}" data-confirm="Lock this payroll? No further edits will be allowed.">
+      {% csrf_token %}
+      <button class="btn btn-ink"><i class="bi bi-lock-fill me-1"></i>Lock payroll</button>
+    </form>
+    {% endif %}
+    {% if period.is_locked and period.status != "paid" %}
+    <form method="post" action="{% url 'payroll:mark_paid' period.pk %}" data-confirm="Mark as paid?">
+      {% csrf_token %}
+      <button class="btn btn-amber"><i class="bi bi-check2-circle me-1"></i>Mark as paid</button>
+    </form>
+    {% endif %}
+    <div class="btn-group">
+      <button class="btn btn-light dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-download me-1"></i>Bank schedule</button>
+      <ul class="dropdown-menu">
+        <li><a class="dropdown-item" href="{% url 'payroll:bank_schedule' period.pk %}?format=csv">CSV</a></li>
+        <li><a class="dropdown-item" href="{% url 'payroll:bank_schedule' period.pk %}?format=xlsx">Excel</a></li>
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% if period.is_locked %}<div class="alert alert-warning py-2"><i class="bi bi-lock-fill me-1"></i> This payroll period is <strong>locked</strong>{% if period.locked_at %} since {{ period.locked_at|date:"M d, Y H:i" }}{% endif %}.</div>{% endif %}
+{% if period.approval_status == "pending" %}<div class="alert alert-info py-2"><i class="bi bi-hourglass-split me-1"></i> Awaiting payroll approval.</div>{% endif %}
+
+<div class="row g-3 mb-4">
+  <div class="col-sm-3">{% include "partials/_stat_card.html" with eyebrow="Payslips" value=payslips.count icon="bi-receipt" accent="ink" %}</div>
+  <div class="col-sm-3">{% include "partials/_stat_card.html" with eyebrow="Total net pay" value=period.total_net_pay|floatformat:0|intcomma icon="bi-cash-stack" accent="amber" %}</div>
+  <div class="col-sm-3">{% include "partials/_stat_card.html" with eyebrow="Status" value=period.get_status_display icon="bi-flag-fill" accent="teal" %}</div>
+  <div class="col-sm-3">{% include "partials/_stat_card.html" with eyebrow="Approval" value=period.get_approval_status_display icon="bi-shield-check" accent="violet" %}</div>
+</div>
+
+<div class="surface-card">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0 datatable">
+      <thead>
+        <tr><th>Employee</th><th>Dept</th><th>Present/Late/Absent</th><th>Gross</th><th>Deductions</th><th>Net pay</th><th class="text-end">Actions</th></tr>
+      </thead>
+      <tbody>
+      {% for slip in payslips %}
+        <tr>
+          <td><div class="fw-semibold" style="font-size:0.85rem;">{{ slip.employee.full_name }}</div><div class="text-secondary" style="font-size:0.74rem;">{{ slip.employee.employee_id }}</div></td>
+          <td>{{ slip.employee.department.name|default:"—" }}</td>
+          <td>{{ slip.days_present }}P / {{ slip.days_late }}L / {{ slip.days_absent }}A</td>
+          <td>{{ COMPANY_CURRENCY_SYMBOL }}{{ slip.gross_pay|floatformat:0|intcomma }}</td>
+          <td>{{ COMPANY_CURRENCY_SYMBOL }}{{ slip.total_deductions|floatformat:0|intcomma }}</td>
+          <td class="fw-semibold">{{ COMPANY_CURRENCY_SYMBOL }}{{ slip.net_pay|floatformat:0|intcomma }}</td>
+          <td class="text-end">
+            <a href="{% url 'payroll:payslip_pdf' slip.pk %}" class="btn btn-sm btn-light" title="Download PDF"><i class="bi bi-file-pdf"></i></a>
+            <a href="{% url 'payroll:payslip_detail' slip.pk %}" class="btn btn-sm btn-light"><i class="bi bi-eye"></i></a>
+            {% if 'manage_payroll' in perms_set and period.can_edit %}
+            <button class="btn btn-sm btn-light" data-modal-url="{% url 'payroll:adjust' slip.pk %}" data-modal-title="Adjust payslip"><i class="bi bi-pencil"></i></button>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7"><div class="empty-state"><i class="bi bi-receipt"></i>No payslips yet.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

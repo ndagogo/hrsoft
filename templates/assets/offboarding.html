@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Offboarding — {{ employee.full_name }}{% endblock %}
+{% block page_title %}Asset Return Checklist{% endblock %}
+{% block page_subtitle %}Complete all returns before offboarding {{ employee.full_name }}{% endblock %}
+
+{% block content %}
+<div class="mb-4"><a href="{% url 'employees:detail' employee.pk %}" class="btn btn-light btn-sm">Back to profile</a></div>
+
+<div class="surface-card surface-card-body mb-4" style="max-width:640px;">
+  <p class="text-secondary small">HR cannot complete exit until every assigned asset is returned and inspected.</p>
+  <ul class="list-group list-group-flush">
+    {% for a in active %}
+    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+      <div>
+        <div class="fw-semibold">Return {{ a.asset.name }}</div>
+        <div class="text-secondary small">{{ a.asset.asset_number }}{% if a.accessories_issued %} · {{ a.accessories_issued }}{% endif %}</div>
+      </div>
+      <span class="text-warning"><i class="bi bi-circle"></i> Pending</span>
+    </li>
+    {% empty %}
+    <li class="list-group-item px-0 text-success"><i class="bi bi-check-circle-fill me-2"></i>All assets returned — ready to offboard</li>
+    {% endfor %}
+  </ul>
+
+  {% if active %}
+  <div class="mt-3">
+    {% for a in active %}
+    <a href="{% url 'assets:return' a.pk %}" class="btn btn-sm btn-light me-1 mb-1">Return {{ a.asset.asset_number }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <form method="post" class="mt-4">{% csrf_token %}
+    <button type="submit" class="btn btn-danger" {% if not ready %}disabled{% endif %} onclick="return confirm('Offboard {{ employee.full_name }}?');">
+      Complete Offboarding
+    </button>
+    {% if not ready %}<span class="text-secondary small ms-2">Resolve all assets first.</span>{% endif %}
+  </form>
+</div>
+{% endblock %}

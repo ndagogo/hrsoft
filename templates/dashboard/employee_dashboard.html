@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}My Dashboard{% endblock %}
+{% block page_title %}Welcome, {{ request.user.first_name|default:request.user.username }}{% endblock %}
+{% block page_subtitle %}Your attendance & leave snapshot · {% now "l, F j" %}{% endblock %}
+
+{% block content %}
+{% if not employee %}
+<div class="empty-state surface-card py-5"><i class="bi bi-person-x"></i>No employee profile is linked to your account yet. Contact HR.</div>
+{% else %}
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="punch-card">
+      <div class="punch-card-icon" style="background:rgba(34,197,94,0.12); color:var(--green-500);"><i class="bi bi-fingerprint"></i></div>
+      <div class="punch-card-eyebrow">Today's Status</div>
+      <div class="punch-card-value" style="font-size:1.3rem;">
+        {% if today_record %}<span class="status-pill status-{{ today_record.status }}">{{ today_record.get_status_display }}</span>{% else %}<span class="status-pill status-absent">Not clocked in</span>{% endif %}
+      </div>
+      {% if today_record.check_in %}<div class="section-subtext mt-2" style="font-size:0.78rem;">In at {{ today_record.check_in|date:"H:i" }}{% if today_record.check_out %} · Out at {{ today_record.check_out|date:"H:i" }}{% endif %}</div>{% endif %}
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Present This Month" value=present_days icon="bi-calendar-check-fill" accent="ink" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Late This Month" value=late_days icon="bi-clock-fill" accent="amber" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Leave Balance" value=leave_balance icon="bi-calendar2-event-fill" accent="violet" subtext="days remaining" %}</div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-xl-7">
+    <div class="surface-card h-100">
+      <div class="surface-card-header"><h3 class="surface-card-title">My attendance — last 14 days</h3></div>
+      <div class="surface-card-body"><canvas id="trendChart" height="110"></canvas></div>
+    </div>
+  </div>
+  <div class="col-xl-5">
+    {% include "partials/_calendar_widget.html" with title="Leave & attendance" scope="personal" calendar_id="empCalendar" %}
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-xl-5">
+    <div class="surface-card h-100">
+      <div class="surface-card-header"><h3 class="surface-card-title">Latest payslip</h3></div>
+      <div class="surface-card-body">
+        {% if recent_payslip %}
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-secondary" style="font-size:0.82rem;">{{ recent_payslip.period.name }}</span>
+            <a href="{% url 'payroll:payslip_detail' recent_payslip.pk %}" class="small">View →</a>
+          </div>
+          <div class="punch-card-value mb-1">{{ COMPANY_CURRENCY_SYMBOL }}{{ recent_payslip.net_pay|floatformat:0 }}</div>
+          <div class="section-subtext" style="font-size:0.78rem;">Net pay · Gross {{ COMPANY_CURRENCY_SYMBOL }}{{ recent_payslip.gross_pay|floatformat:0 }}</div>
+        {% else %}
+          <div class="empty-state py-3"><i class="bi bi-receipt"></i>No payslips yet.</div>
+        {% endif %}
+        <a href="{% url 'leave:my_requests' %}" class="btn btn-amber w-100 mt-3"><i class="bi bi-plus-lg me-1"></i>Request Leave</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="surface-card">
+  <div class="surface-card-header"><h3 class="surface-card-title">My recent leave requests</h3></div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Type</th><th>Dates</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for lr in recent_leave %}
+        <tr>
+          <td>{{ lr.leave_type.name }}</td>
+          <td>{{ lr.start_date|date:"M j" }} – {{ lr.end_date|date:"M j" }}</td>
+          <td><span class="status-pill status-{{ lr.status }}">{{ lr.get_status_display }}</span></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="3" class="empty-state"><i class="bi bi-calendar2-event"></i>No leave requests yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+new Chart(document.getElementById('trendChart'), {
+  type: 'bar',
+  data: {
+    labels: {{ trend_labels|safe }},
+    datasets: [
+      { label: 'Present', data: {{ trend_present|safe }}, backgroundColor: '#22c55e', borderRadius: 4 },
+      { label: 'Late', data: {{ trend_late|safe }}, backgroundColor: '#f5a524', borderRadius: 4 },
+    ]
+  },
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true, max: 1, ticks: { stepSize: 1 }, grid: { color: '#f1f3f9' } }, x: { grid: { display: false } } } }
+});
+</script>
+{% endblock %}

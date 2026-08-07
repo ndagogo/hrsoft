@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Search{% if q %}: {{ q }}{% endif %}{% endblock %}
+{% block page_title %}Search results{% endblock %}
+{% block page_subtitle %}{% if q %}Showing matches for “{{ q }}”{% else %}Enter at least 2 characters to search{% endif %}{% endblock %}
+
+{% block content %}
+<form class="surface-card mb-4" method="get" action="{% url 'core:search' %}">
+  <div class="surface-card-body">
+    <div class="input-group">
+      <span class="input-group-text bg-transparent border-end-0"><i class="bi bi-search"></i></span>
+      <input type="search" name="q" class="form-control border-start-0" value="{{ q }}" placeholder="Search employees, documents, attendance…" autofocus>
+      <button type="submit" class="btn btn-amber">Search</button>
+    </div>
+  </div>
+</form>
+
+{% if q and q|length < 2 %}
+<div class="alert alert-info py-2"><i class="bi bi-info-circle me-1"></i> Type at least 2 characters to search.</div>
+{% elif q %}
+{% with emp_count=results.employees|length doc_count=results.documents|length att_count=results.attendance|length %}
+{% if emp_count or doc_count or att_count %}
+
+<div class="row g-3">
+  {% if emp_count %}
+  <div class="col-xl-6">
+    <div class="surface-card h-100">
+      <div class="surface-card-header d-flex justify-content-between align-items-center">
+        <h3 class="surface-card-title mb-0"><i class="bi bi-people-fill me-1"></i>Employees</h3>
+        <span class="badge text-bg-secondary">{{ emp_count }}</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Name</th><th>ID</th><th>Department</th><th></th></tr></thead>
+          <tbody>
+          {% for e in results.employees %}
+            <tr>
+              <td class="fw-semibold">{{ e.user__first_name }} {{ e.user__last_name }}</td>
+              <td class="text-secondary">{{ e.employee_id }}</td>
+              <td>{{ e.department__name|default:"—" }}</td>
+              <td class="text-end"><a href="{% url 'employees:detail' e.id %}" class="btn btn-sm btn-light">View</a></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if 'view_employees' in perms_set %}
+      <div class="surface-card-body border-top pt-3 pb-3">
+        <a href="{% url 'employees:list' %}?q={{ q|urlencode }}" class="small">View all employee matches →</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if doc_count %}
+  <div class="col-xl-6">
+    <div class="surface-card h-100">
+      <div class="surface-card-header d-flex justify-content-between align-items-center">
+        <h3 class="surface-card-title mb-0"><i class="bi bi-folder-fill me-1"></i>Documents</h3>
+        <span class="badge text-bg-secondary">{{ doc_count }}</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Title</th><th>Category</th></tr></thead>
+          <tbody>
+          {% for d in results.documents %}
+            <tr>
+              <td class="fw-semibold">{{ d.title }}</td>
+              <td class="text-secondary">{{ d.category|default:"—" }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="surface-card-body border-top pt-3 pb-3">
+        <a href="{% url 'documents:list' %}" class="small">Browse documents →</a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if att_count %}
+  <div class="col-xl-6">
+    <div class="surface-card h-100">
+      <div class="surface-card-header d-flex justify-content-between align-items-center">
+        <h3 class="surface-card-title mb-0"><i class="bi bi-calendar-check-fill me-1"></i>Attendance</h3>
+        <span class="badge text-bg-secondary">{{ att_count }}</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Employee</th><th>Date</th><th>Status</th></tr></thead>
+          <tbody>
+          {% for a in results.attendance %}
+            <tr>
+              <td class="fw-semibold">{{ a.employee__user__first_name }} {{ a.employee__user__last_name }}</td>
+              <td>{{ a.date|date:"M j, Y" }}</td>
+              <td><span class="status-pill status-{{ a.status }}">{{ a.status|title }}</span></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="surface-card-body border-top pt-3 pb-3">
+        <a href="{% url 'attendance:list' %}" class="small">View attendance records →</a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% else %}
+<div class="empty-state surface-card py-5">
+  <i class="bi bi-search"></i>
+  <p class="mb-0">No results found for “{{ q }}”.</p>
+</div>
+{% endif %}
+{% endwith %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{{ announcement.title }}{% endblock %}
+{% block page_title %}{{ announcement.title }}{% endblock %}
+{% block page_subtitle %}{{ announcement.get_status_display }} · {{ announcement.get_priority_display }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-4 flex-wrap gap-2">
+  <a href="{% url 'announcements:list' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Announcements</a>
+  {% if can_approve %}
+  <a href="{% url 'announcements:approvals' %}" class="btn btn-light btn-sm"><i class="bi bi-clipboard-check me-1"></i>Approvals</a>
+  {% endif %}
+</div>
+
+<div class="surface-card mb-3">
+  <div class="surface-card-body">
+    <div class="d-flex justify-content-between align-items-start mb-3 gap-2 flex-wrap">
+      <div>
+        <span class="status-pill status-{{ announcement.status }}">{{ announcement.get_status_display }}</span>
+        <span class="chip ms-1 {% if announcement.priority == 'urgent' %}text-danger{% endif %}">{{ announcement.get_priority_display }}</span>
+        <span class="chip ms-1">{{ announcement.audience_label }}</span>
+      </div>
+      <div class="text-secondary" style="font-size:0.78rem;">
+        {% if announcement.published_at %}Published {{ announcement.published_at|date:"M d, Y H:i" }}{% else %}Not published yet{% endif %}
+      </div>
+    </div>
+    <div style="white-space:pre-wrap; font-size:0.95rem;">{{ announcement.content }}</div>
+    <div class="text-secondary mt-3" style="font-size:0.78rem;">
+      By {% if announcement.author %}{{ announcement.author.get_full_name|default:announcement.author.username }}{% else %}—{% endif %}
+      {% if announcement.approved_by %} · Reviewed by {{ announcement.approved_by.get_full_name|default:announcement.approved_by.username }}{% endif %}
+      {% if announcement.approval_note %} · Note: {{ announcement.approval_note }}{% endif %}
+    </div>
+  </div>
+</div>
+
+{% if announcement.attachments.all %}
+<div class="surface-card mb-3">
+  <div class="surface-card-header"><h3 class="surface-card-title">Attachments</h3></div>
+  <div class="surface-card-body">
+    <div class="row g-3">
+      {% for att in announcement.attachments.all %}
+      <div class="col-md-4">
+        {% if att.is_image %}
+        <a href="{{ att.file.url }}" target="_blank" rel="noopener" class="d-block">
+          <img src="{{ att.file.url }}" alt="{{ att.original_name }}" class="img-fluid rounded border" style="max-height:180px; object-fit:cover; width:100%;">
+        </a>
+        {% else %}
+        <a href="{{ att.file.url }}" class="btn btn-light w-100 text-start" target="_blank" rel="noopener">
+          <i class="bi bi-paperclip me-1"></i>{{ att.original_name|default:att.file.name }}
+        </a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if can_approve and announcement.status == 'pending' %}
+<div class="surface-card">
+  <div class="surface-card-header"><h3 class="surface-card-title">Review</h3></div>
+  <div class="surface-card-body">
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Review note</label>
+      <input type="text" form="approveForm" name="note" class="form-control" placeholder="Optional review note" id="reviewNote">
+    </div>
+    <form method="post" action="{% url 'announcements:review' announcement.pk 'approve' %}" class="d-inline" id="approveForm">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{% url 'announcements:detail' announcement.pk %}">
+      <button type="submit" class="btn btn-amber"><i class="bi bi-check-lg me-1"></i>Approve & publish</button>
+    </form>
+    <form method="post" action="{% url 'announcements:review' announcement.pk 'reject' %}" class="d-inline" data-confirm="Reject this announcement?">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{% url 'announcements:detail' announcement.pk %}">
+      <input type="hidden" name="note" id="rejectNoteHidden" value="">
+      <button type="submit" class="btn btn-light text-danger" onclick="document.getElementById('rejectNoteHidden').value=document.getElementById('reviewNote').value"><i class="bi bi-x-lg me-1"></i>Reject</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

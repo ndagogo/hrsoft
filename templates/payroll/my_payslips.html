@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}My Payslips{% endblock %}
+{% block page_title %}My Payslips{% endblock %}
+{% block page_subtitle %}{{ employee.full_name }}{% endblock %}
+
+{% block content %}
+<div class="surface-card">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Period</th><th>Gross pay</th><th>Deductions</th><th>Net pay</th><th>Status</th><th class="text-end">Action</th></tr></thead>
+      <tbody>
+      {% for slip in payslips %}
+        <tr>
+          <td class="fw-semibold">{{ slip.period.name }}</td>
+          <td>{{ COMPANY_CURRENCY_SYMBOL }}{{ slip.gross_pay|floatformat:2|intcomma }}</td>
+          <td>{{ COMPANY_CURRENCY_SYMBOL }}{{ slip.total_deductions|floatformat:2|intcomma }}</td>
+          <td class="fw-semibold">{{ COMPANY_CURRENCY_SYMBOL }}{{ slip.net_pay|floatformat:2|intcomma }}</td>
+          <td><span class="status-pill status-{{ slip.period.status }}">{{ slip.period.get_status_display }}</span></td>
+          <td class="text-end"><a href="{% url 'payroll:payslip_detail' slip.pk %}" class="btn btn-sm btn-light">View →</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6"><div class="empty-state"><i class="bi bi-receipt"></i>No payslips yet.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == 'create' %}Register Asset{% else %}Edit Asset{% endif %}{% endblock %}
+{% block page_title %}{% if mode == 'create' %}Register Asset{% else %}Edit {{ asset.asset_number }}{% endif %}{% endblock %}
+{% block page_subtitle %}Purchase → Register → Approve workflow{% endblock %}
+
+{% block content %}
+<div class="mb-4"><a href="{% url 'assets:list' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a></div>
+<div class="surface-card surface-card-body" style="max-width:900px;">
+  <form method="post">{% csrf_token %}
+    <div class="row g-3">
+      {% for field in form %}
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="mt-4 d-flex gap-2">
+      <button type="submit" class="btn btn-primary">{% if mode == 'create' %}Register Asset{% else %}Save Changes{% endif %}</button>
+      <a href="{% url 'assets:list' %}" class="btn btn-light">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

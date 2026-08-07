@@ -1,0 +1,36 @@
+{% extends "recruitment/careers_base.html" %}
+{% block title %}Open roles{% endblock %}
+{% block content %}
+<section class="careers-hero">
+  <h1>Join our team</h1>
+  <p class="text-secondary col-lg-7 mb-0">Explore open positions at Health Focus Diagnostics. Apply online — our talent team reviews every application.</p>
+</section>
+{% if vacancies %}
+<div class="row g-3">
+  {% for v in vacancies %}
+  <div class="col-md-6">
+    <a href="{% url 'recruitment:careers_detail' v.slug %}" class="text-decoration-none text-dark">
+      <div class="role-card">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <h2 class="h5 mb-1">{{ v.title }}</h2>
+          <span class="badge text-bg-light text-secondary">{{ v.get_employment_type_display }}</span>
+        </div>
+        <p class="small text-secondary mb-2">
+          {{ v.department.name|default:"Organisation-wide" }}
+          {% if v.branch %} · {{ v.branch.name }}{% endif %}
+          · {{ v.get_work_mode_display }}
+        </p>
+        <p class="small mb-0 text-truncate">{{ v.description|truncatewords:28 }}</p>
+        {% if v.closing_date %}<p class="small text-muted mt-2 mb-0">Closes {{ v.closing_date|date:"M d, Y" }}</p>{% endif %}
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5 text-secondary">
+  <i class="bi bi-briefcase display-6 d-block mb-2"></i>
+  No public openings right now. Check back soon.
+</div>
+{% endif %}
+{% endblock %}

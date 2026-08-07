@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}Biometric Devices{% endblock %}
+{% block page_title %}Biometric Devices{% endblock %}
+{% block page_subtitle %}ZKTeco (TCP 4370) &amp; HikVision attendance terminals{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+  <div>
+    <h2 class="section-heading">Connected terminals</h2>
+    <p class="section-subtext mb-0">Your ZKTeco unit should use static IP <code>192.168.1.201</code> and TCP COMM port <code>4370</code> (DHCP Off). Pull sync downloads punches over that port.</p>
+  </div>
+  <button class="btn btn-amber" data-bs-toggle="modal" data-bs-target="#newDeviceModal"><i class="bi bi-cpu me-1"></i>Register Device</button>
+</div>
+
+<div class="row g-3 mb-4">
+  {% for device in devices %}
+  <div class="col-md-6 col-xl-4">
+    <div class="surface-card surface-card-body h-100">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div>
+          <h5 class="font-display fw-semibold mb-0">{{ device.name }}</h5>
+          <div class="text-secondary" style="font-size:0.78rem;">{{ device.location|default:"No location set" }}</div>
+        </div>
+        {% if device.is_active %}
+          <span class="status-pill status-present">Active</span>
+        {% else %}
+          <span class="status-pill status-cancelled">Disabled</span>
+        {% endif %}
+      </div>
+
+      <div style="font-size:0.83rem;">
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Brand</span><span class="fw-semibold">{{ device.get_brand_display }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">IP address</span><span class="fw-semibold">{{ device.ip_address }}:{{ device.port }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Mode</span><span class="fw-semibold">{{ device.get_connection_mode_display }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Last sync</span><span class="fw-semibold">{{ device.last_sync_at|date:"M d, H:i"|default:"Never" }}</span></div>
+      </div>
+
+      {% if device.last_sync_status == "error" %}
+      <div class="alert alert-danger py-2 px-3 mt-2 mb-0" style="font-size:0.78rem;"><i class="bi bi-exclamation-triangle-fill me-1"></i>{{ device.last_sync_message }}</div>
+      {% elif device.last_sync_message %}
+      <div class="text-secondary mt-2" style="font-size:0.76rem;"><i class="bi bi-check-circle text-success me-1"></i>{{ device.last_sync_message }}</div>
+      {% endif %}
+
+      <div class="d-flex gap-2 mt-3 pt-3 border-top flex-wrap">
+        <form method="post" action="{% url 'biometric_api:test_connection' device.pk %}">
+          {% csrf_token %}
+          <button class="btn btn-sm btn-light"><i class="bi bi-broadcast-pin me-1"></i>Test</button>
+        </form>
+        {% if device.connection_mode == "pull" or device.connection_mode == "both" %}
+        <form method="post" action="{% url 'biometric_api:manual_sync' device.pk %}" class="flex-grow-1">
+          {% csrf_token %}
+          <button class="btn btn-sm btn-ink w-100"><i class="bi bi-arrow-repeat me-1"></i>Sync now</button>
+        </form>
+        {% endif %}
+        <button class="btn btn-sm btn-light" type="button" data-bs-toggle="collapse" data-bs-target="#webhookInfo{{ device.pk }}"><i class="bi bi-info-circle"></i></button>
+        <button class="btn btn-sm btn-light" type="button" data-bs-toggle="modal" data-bs-target="#editDeviceModal{{ device.pk }}"><i class="bi bi-gear"></i></button>
+        <form method="post" action="{% url 'attendance:device_delete' device.pk %}" onsubmit="return confirm('Remove {{ device.name }}? Historic punches stay on record.');">
+          {% csrf_token %}<button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+        </form>
+      </div>
+
+      <div class="collapse mt-3" id="webhookInfo{{ device.pk }}">
+        <div class="p-3 rounded" style="background:var(--ink-50); font-size:0.76rem;">
+          {% if device.brand == "zkteco" %}
+          <div class="fw-semibold mb-1">ZKTeco pull settings (match the device Ethernet screen):</div>
+          <ul class="mb-2 ps-3">
+            <li>IP Address: <code>{{ device.ip_address }}</code></li>
+            <li>TCP COMM. Port: <code>{{ device.port }}</code></li>
+            <li>Comm key: <code>{{ device.comm_key }}</code></li>
+            <li>DHCP: Off (static IP)</li>
+          </ul>
+          <div class="text-secondary">Ensure this server can reach <code>{{ device.ip_address }}:{{ device.port }}</code> on the LAN. Enrol staff User IDs on the device to match each employee’s biometric ID in HRMS.</div>
+          {% else %}
+          <div class="fw-semibold mb-1">Push-mode webhook URL (configure on the device):</div>
+          <code style="word-break:break-all;">{{ request.scheme }}://{{ request.get_host }}/api/biometric/webhook/?token={{ device.webhook_token }}</code>
+          <div class="text-secondary mt-2">On HikVision: Configuration → Network → Advanced Settings → HTTP Listening (or event-linkage notify) and paste this URL.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit modal per device -->
+  <div class="modal fade" id="editDeviceModal{{ device.pk }}" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <form method="post" action="{% url 'attendance:device_edit' device.pk %}">
+          {% csrf_token %}
+          <div class="modal-header"><h5 class="modal-title font-display">Edit {{ device.name }}</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body">
+            {% include "attendance/_device_fields.html" with form=form device=device %}
+          </div>
+          <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-amber">Save changes</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="col-12"><div class="empty-state"><i class="bi bi-cpu"></i>No devices registered yet. Add your ZKTeco terminal (192.168.1.201:4370).</div></div>
+  {% endfor %}
+</div>
+
+{% if unmatched_ids %}
+<div class="surface-card mb-4">
+  <div class="surface-card-header">
+    <h3 class="surface-card-title">Unmatched device User IDs</h3>
+  </div>
+  <div class="surface-card-body">
+    <p class="section-subtext mb-3">These IDs came from the terminal but are not linked to any employee yet. Link them so punches become attendance.</p>
+    <div class="table-responsive">
+      <table class="table table-hrms mb-0">
+        <thead><tr><th>Device User ID</th><th>Link to employee</th><th></th></tr></thead>
+        <tbody>
+        {% for uid in unmatched_ids %}
+          <tr>
+            <td><code>{{ uid }}</code></td>
+            <td>
+              <form method="post" action="{% url 'attendance:link_biometric' %}" class="d-flex gap-2 align-items-center">
+                {% csrf_token %}
+                <input type="hidden" name="device_employee_no" value="{{ uid }}">
+                <select name="employee_id" class="form-select form-select-sm" required style="max-width:320px;">
+                  <option value="">Select employee…</option>
+                  {% for emp in employees %}
+                  <option value="{{ emp.pk }}">{{ emp.full_name }} ({{ emp.employee_id }}){% if emp.biometric_id %} — already {{ emp.biometric_id }}{% endif %}</option>
+                  {% endfor %}
+                </select>
+                <button class="btn btn-sm btn-amber">Link</button>
+              </form>
+            </td>
+            <td></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="surface-card">
+  <div class="surface-card-header"><h3 class="surface-card-title">Recent raw punches</h3></div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Employee</th><th>Device employee no.</th><th>Device</th><th>Source</th><th>Time</th><th>Matched</th></tr></thead>
+      <tbody>
+      {% for log in recent_logs %}
+        <tr>
+          <td>{{ log.employee.full_name|default:"Unmatched" }}</td>
+          <td><code>{{ log.device_employee_no }}</code></td>
+          <td>{{ log.device.name|default:"—" }}</td>
+          <td><span class="chip"><i class="bi bi-{{ log.source }}"></i> {{ log.get_source_display }}</span></td>
+          <td>{{ log.timestamp|date:"M d, H:i:s" }}</td>
+          <td>{% if log.matched %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<span class="text-danger" style="font-size:0.78rem;">Unmatched</span>{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6"><div class="empty-state"><i class="bi bi-fingerprint"></i>No punches received yet.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- New device modal -->
+<div class="modal fade" id="newDeviceModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'attendance:device_create' %}">
+        {% csrf_token %}
+        <div class="modal-header"><h5 class="modal-title font-display">Register a new device</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          {% include "attendance/_device_fields.html" with form=form %}
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-amber">Register device</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

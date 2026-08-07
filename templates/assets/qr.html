@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}QR — {{ asset.asset_number }}{% endblock %}
+{% block page_title %}{{ asset.name }}{% endblock %}
+{% block page_subtitle %}Scan for audit verification{% endblock %}
+{% block content %}
+<div class="row g-4 justify-content-center">
+  <div class="col-md-5">
+    <div class="surface-card surface-card-body text-center">
+      <img src="{% url 'assets:qr' asset.pk %}?format=png" alt="QR Code" class="img-fluid mb-3" style="max-width:220px;">
+      <h4 class="font-display fw-semibold">{{ asset.name }}</h4>
+      <div class="text-secondary mb-3">{{ asset.asset_number }}</div>
+      <div class="text-start small">
+        <div class="d-flex justify-content-between py-1">
+          <span class="text-secondary">Assigned To</span>
+          <span class="fw-semibold">{% if assignment %}{{ assignment.employee.full_name }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="d-flex justify-content-between py-1">
+          <span class="text-secondary">Department</span>
+          <span>
+            {% if assignment and assignment.department %}
+              {{ assignment.department.name }}
+            {% elif asset.department %}
+              {{ asset.department.name }}
+            {% else %}
+              —
+            {% endif %}
+          </span>
+        </div>
+        <div class="d-flex justify-content-between py-1">
+          <span class="text-secondary">Condition</span>
+          <span>{{ asset.get_condition_display }}</span>
+        </div>
+        <div class="d-flex justify-content-between py-1">
+          <span class="text-secondary">Warranty</span>
+          <span>{% if asset.warranty_end %}{{ asset.warranty_end|date:"Y" }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="d-flex justify-content-between py-1">
+          <span class="text-secondary">Location</span>
+          <span>
+            {% if asset.location %}
+              {{ asset.location }}
+            {% elif asset.branch %}
+              {{ asset.branch.name }}
+            {% else %}
+              —
+            {% endif %}
+          </span>
+        </div>
+      </div>
+      <a href="{% url 'assets:detail' asset.pk %}" class="btn btn-light btn-sm mt-3">Full Record</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

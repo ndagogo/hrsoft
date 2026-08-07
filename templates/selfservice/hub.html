@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Self-Service{% endblock %}
+{% block page_title %}Employee Self-Service{% endblock %}
+{% block page_subtitle %}Submit requests for HR review{% endblock %}
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><a href="{% url 'selfservice:profile_request' %}" class="quick-action-btn"><i class="bi bi-person-gear"></i> Profile update</a></div>
+  <div class="col-md-3"><a href="{% url 'selfservice:attendance_request' %}" class="quick-action-btn"><i class="bi bi-calendar-plus"></i> Attendance correction</a></div>
+  <div class="col-md-3"><a href="{% url 'selfservice:loan_request' %}" class="quick-action-btn"><i class="bi bi-cash"></i> Loan request</a></div>
+  <div class="col-md-3"><a href="{% url 'selfservice:training_request' %}" class="quick-action-btn"><i class="bi bi-mortarboard"></i> Training request</a></div>
+</div>
+{% if 'manage_employees' in perms_set %}
+<div class="mb-3">
+  <a href="{% url 'selfservice:approvals' %}" class="btn btn-light btn-sm"><i class="bi bi-check2-square me-1"></i>Review pending requests</a>
+</div>
+{% endif %}
+<div class="row g-3">
+  <div class="col-xl-6">
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title">My requests</h3></div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Type</th><th>Status</th><th>Date</th></tr></thead>
+          <tbody>
+          {% for r in profile_requests %}
+            <tr><td>Profile: {{ r.field_name }}</td><td><span class="status-pill status-{{ r.status }}">{{ r.get_status_display }}</span></td><td>{{ r.created_at|date:"M d" }}</td></tr>
+          {% endfor %}
+          {% for r in attendance_requests %}
+            <tr><td>Attendance: {{ r.date }}</td><td><span class="status-pill status-{{ r.status }}">{{ r.get_status_display }}</span></td><td>{{ r.created_at|date:"M d" }}</td></tr>
+          {% endfor %}
+          {% for r in loan_requests %}
+            <tr><td>Loan: {{ COMPANY_CURRENCY_SYMBOL }}{{ r.amount }}</td><td><span class="status-pill status-{{ r.status }}">{{ r.get_status_display }}</span></td><td>{{ r.created_at|date:"M d" }}</td></tr>
+          {% endfor %}
+          {% for r in training_requests %}
+            <tr><td>Training: {{ r.course_title }}</td><td><span class="status-pill status-{{ r.status }}">{{ r.get_status_display }}</span></td><td>{{ r.created_at|date:"M d" }}</td></tr>
+          {% endfor %}
+          {% if not profile_requests and not attendance_requests and not loan_requests and not training_requests %}
+            <tr><td colspan="3"><div class="empty-state"><i class="bi bi-inbox"></i>No requests yet.</div></td></tr>
+          {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-6">
+    {% include "partials/_calendar_widget.html" with title="My leave & attendance" scope="personal" calendar_id="essCalendar" %}
+  </div>
+</div>
+{% endblock %}

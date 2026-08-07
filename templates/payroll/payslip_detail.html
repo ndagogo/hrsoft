@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Payslip — {{ payslip.period.name }}{% endblock %}
+{% block page_title %}Payslip{% endblock %}
+{% block page_subtitle %}{{ payslip.period.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <a href="javascript:history.back()" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+  <button class="btn btn-ink btn-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
+  <a href="{% url 'payroll:payslip_pdf' payslip.pk %}" class="btn btn-amber btn-sm"><i class="bi bi-file-pdf me-1"></i>Download PDF</a>
+</div>
+
+<div class="surface-card mx-auto" style="max-width:760px;">
+  <div class="surface-card-body">
+    <div class="d-flex justify-content-between align-items-start mb-4 pb-4 border-bottom">
+      <div>
+        <div class="sidebar-brand-mark" style="display:inline-flex;">HR</div>
+        <h4 class="font-display fw-semibold mt-2 mb-0">{{ COMPANY_NAME }}</h4>
+        <div class="text-secondary" style="font-size:0.82rem;">Payslip — {{ payslip.period.name }}</div>
+      </div>
+      <span class="status-pill status-{{ payslip.period.status }}">{{ payslip.period.get_status_display }}</span>
+    </div>
+
+    <div class="row mb-4">
+      <div class="col-6">
+        <div class="text-secondary" style="font-size:0.74rem; text-transform:uppercase; letter-spacing:0.04em;">Employee</div>
+        <div class="fw-semibold">{{ payslip.employee.full_name }}</div>
+        <div class="text-secondary" style="font-size:0.82rem;">{{ payslip.employee.employee_id }} · {{ payslip.employee.designation.title|default:"—" }}</div>
+      </div>
+      <div class="col-6 text-end">
+        <div class="text-secondary" style="font-size:0.74rem; text-transform:uppercase; letter-spacing:0.04em;">Pay period</div>
+        <div class="fw-semibold">{{ payslip.period.start_date|date:"M d" }} – {{ payslip.period.end_date|date:"M d, Y" }}</div>
+        <div class="text-secondary" style="font-size:0.82rem;">{{ payslip.days_present }} present · {{ payslip.days_late }} late · {{ payslip.days_absent }} absent</div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-6">
+        <h6 class="fw-semibold mb-3" style="font-size:0.8rem; text-transform:uppercase; color:var(--text-secondary);">Earnings</h6>
+        <div class="d-flex justify-content-between py-2 border-bottom"><span>Basic salary</span><span>{{ COMPANY_CURRENCY_SYMBOL }}{{ payslip.basic_salary|floatformat:2|intcomma }}</span></div>
+        <div class="d-flex justify-content-between py-2 border-bottom"><span>Housing allowance</span><span>{{ COMPANY_CURRENCY_SYMBOL }}{{ payslip.housing_allowance|floatformat:2|intcomma }}</span></div>
+        <div class="d-flex justify-content-between py-2 border-bottom"><span>Transport allowance</span><span>{{ COMPANY_CURRENCY_SYMBOL }}{{ payslip.transport_allowance|floatformat:2|intcomma }}</span></div>
+        <div class="d-flex justify-content-between py-2 border-bottom"><span>Other allowance</span><span>{{ COMPANY_CURRENCY_SYMBOL }}{{ payslip.other_allowance|floatformat:2|intcomma }}</span></div>
+        <div class="d-flex justify-content-between py-2 fw-semibold"><span>Gross pay</span><span>{{ COMPANY_CURRENCY_SYMBOL }}{{ payslip.gross_pay|floatformat:2|intcomma }}</span></div>
+      </div>
+      <div class="col-6">
+        <h6 class="fw-semibold mb-3" style="font-size:0.8rem; text-transform:uppercase; color:var(--text-secondary);">Deductions</h6>
+        <div class="d-flex justify-content-between py-2 border-bottom"><span>Tax</span><span>{{ COMPANY_CURRENCY_SYMBOL }}{{ payslip.tax_deduction|floatformat:2|intcomma }}</span></div>
+        <div class="d-flex justify-content-between py-2 border-bottom"><span>Pension</span><span>{{ COMPANY_CURRENCY_SYMBOL }}{{ payslip.pension_deduction|floatformat:2|intcomma }}</span></div>
+        <div class="d-flex justify-content-between py-2 border-bottom"><span>Late penalty</span><span>{{ COMPANY_CURRENCY_SYMBOL }}{{ payslip.late_penalty_deduction|floatformat:2|intcomma }}</span></div>
+        <div class="d-flex justify-content-between py-2 border-bottom"><span>Other</span><span>{{ COMPANY_CURRENCY_SYMBOL }}{{ payslip.other_deduction|floatformat:2|intcomma }}</span></div>
+        <div class="d-flex justify-content-between py-2 fw-semibold"><span>Total deductions</span><span>{{ COMPANY_CURRENCY_SYMBOL }}{{ payslip.total_deductions|floatformat:2|intcomma }}</span></div>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mt-4 pt-4 border-top">
+      <span class="font-display fw-semibold" style="font-size:1.1rem;">Net pay</span>
+      <span class="font-display fw-semibold" style="font-size:1.6rem;">{{ COMPANY_CURRENCY_SYMBOL }}{{ payslip.net_pay|floatformat:2|intcomma }}</span>
+    </div>
+  </div>
+</div>
+{% endblock %}

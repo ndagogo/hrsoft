@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Stand-in Requests{% endblock %}
+{% block page_title %}Stand-in Requests{% endblock %}
+{% block page_subtitle %}Colleagues who nominated you to cover their duties{% endblock %}
+
+{% block content %}
+<div class="surface-card mb-4">
+  <div class="surface-card-header"><h3 class="surface-card-title">Pending stand-in requests</h3></div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Employee</th><th>Leave type</th><th>Dates</th><th>Department</th><th></th></tr></thead>
+      <tbody>
+      {% for req in pending %}
+        <tr>
+          <td class="fw-semibold">{{ req.employee.full_name }}</td>
+          <td>{{ req.leave_request.leave_type.name }}</td>
+          <td>{{ req.leave_request.start_date|date:"M d" }} – {{ req.leave_request.end_date|date:"M d, Y" }}</td>
+          <td>{{ req.employee.department.name|default:"—" }}</td>
+          <td class="text-end">
+            <a href="{% url 'leave:stand_in_respond' req.pk %}" class="btn btn-sm btn-amber">Review & respond</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5"><div class="empty-state py-4"><i class="bi bi-person-check"></i>No pending stand-in requests.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="surface-card">
+  <div class="surface-card-header"><h3 class="surface-card-title">Stand-in history</h3></div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Covered</th><th>Leave</th><th>Dates</th><th>Your response</th></tr></thead>
+      <tbody>
+      {% for req in history %}
+        <tr>
+          <td>{{ req.employee.full_name }}</td>
+          <td>{{ req.leave_request.leave_type.name }}</td>
+          <td>{{ req.leave_request.start_date|date:"M d, Y" }} – {{ req.leave_request.end_date|date:"M d, Y" }}</td>
+          <td><span class="status-pill status-{{ req.status }}">{{ req.get_status_display }}</span></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="text-secondary small">No stand-in history yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

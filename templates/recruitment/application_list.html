@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Applications{% endblock %}
+{% block page_title %}Applications{% endblock %}
+{% block page_subtitle %}All candidates{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between gap-2 mb-4">
+  <form method="get" class="d-flex flex-wrap gap-2">
+    <input type="search" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Name or email…" style="width:180px;">
+    <select name="status" class="form-select form-select-sm">
+      <option value="">All statuses</option>
+      {% for val, label in statuses %}<option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <select name="vacancy" class="form-select form-select-sm">
+      <option value="">All vacancies</option>
+      {% for v in vacancies %}<option value="{{ v.pk }}" {% if vacancy_filter == v.pk|stringformat:'s' %}selected{% endif %}>{{ v.title }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-light btn-sm">Filter</button>
+  </form>
+  <div class="d-flex gap-2">
+    <a href="{% url 'recruitment:pipeline' %}" class="btn btn-outline-primary btn-sm">Kanban</a>
+    {% if can_manage %}<a href="{% url 'recruitment:application_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Add applicant</a>{% endif %}
+  </div>
+</div>
+<div class="surface-card">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0 datatable">
+      <thead><tr><th>Candidate</th><th>Role</th><th>Source</th><th>Status</th><th>Recruiter</th><th>Applied</th></tr></thead>
+      <tbody>
+      {% for a in applications %}
+      <tr>
+        <td><a href="{% url 'recruitment:application_detail' a.pk %}" class="fw-semibold">{{ a.full_name }}</a><div class="small text-secondary">{{ a.email }}</div></td>
+        <td>{{ a.vacancy.title }}</td>
+        <td>{{ a.get_source_display }}</td>
+        <td><span class="status-pill status-{{ a.status }}">{{ a.get_status_display }}</span></td>
+        <td>{{ a.assigned_recruiter|default:"—" }}</td>
+        <td>{{ a.applied_at|date:"M d, Y" }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

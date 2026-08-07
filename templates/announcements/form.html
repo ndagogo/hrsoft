@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}New announcement{% endblock %}
+{% block page_title %}Create announcement{% endblock %}
+{% block page_subtitle %}Choose who should receive this broadcast{% if can_publish_now %}, then submit or publish{% endif %}{% endblock %}
+{% block content %}
+<div class="surface-card mx-auto" style="max-width:720px;">
+  <div class="surface-card-body">
+    <form method="post" enctype="multipart/form-data" id="announcementForm">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold">{{ form.title.label }}</label>
+        {{ form.title }}
+        {% if form.title.errors %}<div class="text-danger small">{{ form.title.errors }}</div>{% endif %}
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">{{ form.content.label }}</label>
+        {{ form.content }}
+        {% if form.content.errors %}<div class="text-danger small">{{ form.content.errors }}</div>{% endif %}
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">{{ form.priority.label }}</label>
+          {{ form.priority }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Expires at</label>
+          {{ form.expires_at }}
+          <div class="form-text">{{ form.expires_at.help_text }}</div>
+        </div>
+      </div>
+
+      <div class="border rounded p-3 mb-4" style="background: var(--surface-muted, #f8fafc);">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">{{ form.audience_type.label }}</label>
+          {{ form.audience_type }}
+          <div class="form-text">Only the selected audience will see and be notified of this announcement.</div>
+          {% if form.audience_type.errors %}<div class="text-danger small">{{ form.audience_type.errors }}</div>{% endif %}
+        </div>
+
+        <div class="mb-0 audience-panel" id="audience-department" hidden>
+          <label class="form-label fw-semibold">{{ form.departments.label }}</label>
+          {{ form.departments }}
+          <div class="form-text">{{ form.departments.help_text }}</div>
+          {% if form.departments.errors %}<div class="text-danger small">{{ form.departments.errors }}</div>{% endif %}
+        </div>
+
+        <div class="mb-0 audience-panel" id="audience-branch" hidden>
+          <label class="form-label fw-semibold">{{ form.branches.label }}</label>
+          {{ form.branches }}
+          <div class="form-text">{{ form.branches.help_text }}</div>
+          {% if form.branches.errors %}<div class="text-danger small">{{ form.branches.errors }}</div>{% endif %}
+        </div>
+
+        <div class="mb-0 audience-panel" id="audience-cadre" hidden>
+          <label class="form-label fw-semibold">{{ form.cadres.label }}</label>
+          {{ form.cadres }}
+          <div class="form-text">{{ form.cadres.help_text }}</div>
+          {% if form.cadres.errors %}<div class="text-danger small">{{ form.cadres.errors }}</div>{% endif %}
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Attachments</label>
+        {{ form.attachments }}
+        <div class="form-text">Images, PDFs, Word, Excel, and other files. You can select multiple.</div>
+      </div>
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <a href="{% url 'announcements:list' %}" class="btn btn-light">Cancel</a>
+        <div class="d-flex gap-2">
+          {% if can_publish_now %}
+          <button type="submit" name="publish_now" value="1" class="btn btn-ink">Publish now</button>
+          {% endif %}
+          <button type="submit" class="btn btn-amber">Submit for approval</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const select = document.getElementById('id_audience_type');
+  if (!select) return;
+  const panels = {
+    department: document.getElementById('audience-department'),
+    branch: document.getElementById('audience-branch'),
+    cadre: document.getElementById('audience-cadre'),
+  };
+  function sync() {
+    const value = select.value;
+    Object.entries(panels).forEach(([key, el]) => {
+      if (!el) return;
+      el.hidden = value !== key;
+    });
+  }
+  select.addEventListener('change', sync);
+  sync();
+})();
+</script>
+{% endblock %}

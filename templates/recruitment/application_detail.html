@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}{{ application.full_name }}{% endblock %}
+{% block page_title %}{{ application.full_name }}{% endblock %}
+{% block page_subtitle %}{{ application.vacancy.title }} · <span class="status-pill status-{{ application.status }}">{{ application.get_status_display }}</span>{% endblock %}
+{% block content %}
+<div class="mb-4 d-flex flex-wrap gap-2">
+  <a href="{% url 'recruitment:applications' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Applications</a>
+  <a href="{% url 'recruitment:vacancy_detail' application.vacancy_id %}" class="btn btn-outline-secondary btn-sm">Vacancy</a>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="surface-card surface-card-body mb-3">
+      <div class="row g-3 small">
+        <div class="col-md-4"><div class="text-secondary">Email</div><div><a href="mailto:{{ application.email }}">{{ application.email }}</a></div></div>
+        <div class="col-md-4"><div class="text-secondary">Phone</div><div>{{ application.phone|default:"—" }}</div></div>
+        <div class="col-md-4"><div class="text-secondary">Source</div><div>{{ application.get_source_display }}</div></div>
+        <div class="col-md-4"><div class="text-secondary">Current role</div><div>{{ application.current_title|default:"—" }}{% if application.current_employer %} @ {{ application.current_employer }}{% endif %}</div></div>
+        <div class="col-md-4"><div class="text-secondary">Experience</div><div>{{ application.years_experience|default:"—" }} yrs</div></div>
+        <div class="col-md-4"><div class="text-secondary">Expected salary</div><div>{{ application.expected_salary|default:"—" }}</div></div>
+        <div class="col-md-4"><div class="text-secondary">Notice</div><div>{% if application.notice_period_days %}{{ application.notice_period_days }} days{% else %}—{% endif %}</div></div>
+        <div class="col-md-4"><div class="text-secondary">LinkedIn</div><div>{% if application.linkedin_url %}<a href="{{ application.linkedin_url }}" target="_blank">Profile</a>{% else %}—{% endif %}</div></div>
+        <div class="col-md-4"><div class="text-secondary">Resume</div><div>{% if application.resume %}<a href="{{ application.resume.url }}" target="_blank">Download</a>{% else %}—{% endif %}</div></div>
+      </div>
+      {% if application.cover_letter %}
+      <hr><h3 class="h6">Cover letter</h3>
+      <p class="small" style="white-space:pre-wrap;">{{ application.cover_letter }}</p>
+      {% endif %}
+      {% if application.rejection_reason %}
+      <div class="alert alert-warning small mt-2 mb-0">Rejected: {{ application.rejection_reason }}{% if application.rejection_notes %} — {{ application.rejection_notes }}{% endif %}</div>
+      {% endif %}
+    </div>
+
+    {% if can_manage %}
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title">Schedule interview</h3></div>
+      <div class="surface-card-body">
+        <form method="post" action="{% url 'recruitment:application_interview' application.pk %}">{% csrf_token %}
+          <div class="row g-2">
+            {% for field in interview_form %}
+            <div class="{% if field.name in 'notes,panel_members' %}col-12{% else %}col-md-6{% endif %}">
+              <label class="form-label small">{{ field.label }}</label>{{ field }}
+            </div>
+            {% endfor %}
+          </div>
+          <button class="btn btn-primary btn-sm mt-2">Schedule</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title">Interviews</h3></div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Round</th><th>Type</th><th>When</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+          {% for i in interviews %}
+          <tr>
+            <td>R{{ i.round_number }}</td>
+            <td>{{ i.get_interview_type_display }}</td>
+            <td>{{ i.scheduled_at|date:"M d, Y H:i" }}</td>
+            <td>{% if i.completed %}Done{% else %}Scheduled{% endif %}</td>
+            <td><a href="{% url 'recruitment:interview_detail' i.pk %}">Open</a></td>
+          </tr>
+          {% empty %}<tr><td colspan="5" class="text-secondary small">No interviews yet.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <div class="surface-card h-100">
+          <div class="surface-card-header"><h3 class="surface-card-title">Assessments</h3></div>
+          <ul class="list-group list-group-flush">
+            {% for a in assessments %}
+            <li class="list-group-item small">{{ a.title }} · {{ a.get_status_display }}{% if a.score %} · {{ a.score }}/{{ a.max_score }}{% endif %}</li>
+            {% empty %}<li class="list-group-item small text-secondary">None</li>{% endfor %}
+          </ul>
+          {% if can_manage %}
+          <div class="surface-card-body border-top">
+            <form method="post" action="{% url 'recruitment:application_assessment' application.pk %}">{% csrf_token %}
+              {% for field in assessment_form %}<div class="mb-2"><label class="form-label small">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+              <button class="btn btn-sm btn-outline-primary">Add assessment</button>
+            </form>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="surface-card h-100">
+          <div class="surface-card-header"><h3 class="surface-card-title">References</h3></div>
+          <ul class="list-group list-group-flush">
+            {% for r in references %}
+            <li class="list-group-item small"><strong>{{ r.referee_name }}</strong> — {{ r.referee_company }}{% if r.would_rehire != None %} · rehire: {{ r.would_rehire|yesno:"Yes,No" }}{% endif %}</li>
+            {% empty %}<li class="list-group-item small text-secondary">None</li>{% endfor %}
+          </ul>
+          {% if can_manage %}
+          <div class="surface-card-body border-top">
+            <form method="post" action="{% url 'recruitment:application_reference' application.pk %}">{% csrf_token %}
+              {% for field in reference_form %}<div class="mb-2"><label class="form-label small">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+              <button class="btn btn-sm btn-outline-primary">Add reference</button>
+            </form>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title">Offer</h3></div>
+      <div class="surface-card-body">
+        {% if offer %}
+        <p class="small mb-2">Status: <span class="status-pill status-{{ offer.status }}">{{ offer.get_status_display }}</span> · {{ offer.currency }} {{ offer.salary_offered }} · start {{ offer.start_date|date:"M d, Y" }}</p>
+        {% endif %}
+        {% if can_manage %}
+        <form method="post" action="{% url 'recruitment:application_offer' application.pk %}" enctype="multipart/form-data">{% csrf_token %}
+          <div class="row g-2">
+            {% for field in offer_form %}
+            <div class="{% if field.name in 'benefits_summary,offer_notes' %}col-12{% else %}col-md-6{% endif %}">
+              <label class="form-label small">{{ field.label }}</label>{{ field }}
+            </div>
+            {% endfor %}
+          </div>
+          <div class="d-flex flex-wrap gap-2 mt-3">
+            <button name="action" value="draft" class="btn btn-light btn-sm">Save draft</button>
+            <button name="action" value="send" class="btn btn-primary btn-sm">Issue offer</button>
+          </div>
+        </form>
+        {% if offer and offer.status == 'sent' or offer and offer.status == 'accepted' %}
+        <form method="post" action="{% url 'recruitment:offer_respond' offer.pk %}" class="mt-3 d-flex flex-wrap gap-2">{% csrf_token %}
+          {% if offer.status == 'sent' %}
+          <button name="action" value="accept" class="btn btn-success btn-sm">Mark accepted</button>
+          <button name="action" value="decline" class="btn btn-outline-danger btn-sm">Mark declined</button>
+          {% endif %}
+          {% if offer.status == 'accepted' or offer.status == 'sent' %}
+          <button name="action" value="hire" class="btn btn-dark btn-sm">Mark hired</button>
+          {% endif %}
+        </form>
+        {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    {% if can_manage %}
+    <div class="surface-card surface-card-body mb-3">
+      <h3 class="h6">Move stage</h3>
+      <form method="post" action="{% url 'recruitment:application_status' application.pk %}">{% csrf_token %}
+        <div class="mb-2"><label class="form-label small">Status</label>{{ status_form.status }}</div>
+        <div class="mb-2"><label class="form-label small">Note</label>{{ status_form.note }}</div>
+        <div class="mb-2"><label class="form-label small">Rejection reason</label>{{ status_form.rejection_reason }}</div>
+        <button class="btn btn-primary btn-sm w-100">Update</button>
+      </form>
+    </div>
+    <div class="surface-card surface-card-body mb-3">
+      <h3 class="h6">Add note</h3>
+      <form method="post" action="{% url 'recruitment:application_note' application.pk %}">{% csrf_token %}
+        {{ note_form.body }}
+        <div class="form-check mt-2">{{ note_form.is_private }} <label class="form-check-label small">Private</label></div>
+        <button class="btn btn-outline-secondary btn-sm mt-2">Save note</button>
+      </form>
+    </div>
+    {% endif %}
+
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title">Notes</h3></div>
+      <ul class="list-group list-group-flush">
+        {% for n in notes %}
+        <li class="list-group-item small">
+          <div class="text-secondary">{{ n.author }} · {{ n.created_at|date:"M d, H:i" }}</div>
+          {{ n.body }}
+        </li>
+        {% empty %}<li class="list-group-item small text-secondary">No notes</li>{% endfor %}
+      </ul>
+    </div>
+
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title">Activity</h3></div>
+      <ul class="list-group list-group-flush">
+        {% for act in activities %}
+        <li class="list-group-item small">
+          <div class="text-secondary">{{ act.created_at|date:"M d, H:i" }} · {{ act.actor|default:"System" }}</div>
+          <strong>{{ act.event }}</strong>{% if act.from_status %} {{ act.from_status }} → {{ act.to_status }}{% endif %}
+          {% if act.detail %}<div>{{ act.detail }}</div>{% endif %}
+        </li>
+        {% empty %}<li class="list-group-item small text-secondary">No activity</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

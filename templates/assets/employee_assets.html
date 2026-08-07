@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Assigned Assets — {{ employee.full_name }}{% endblock %}
+{% block page_title %}Assigned Assets{% endblock %}
+{% block page_subtitle %}{{ employee.full_name }}{% endblock %}
+{% block content %}
+<div class="surface-card mb-4">
+  <div class="surface-card-header"><h3 class="surface-card-title">Currently Assigned</h3></div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Asset</th><th>Tag</th><th>Issued</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for a in active %}
+        <tr>
+          <td class="fw-semibold">{{ a.asset.name }}</td>
+          <td class="font-monospace">{{ a.asset.asset_number }}</td>
+          <td>{{ a.assigned_date|date:"M d, Y" }}</td>
+          <td><span class="status-pill status-assigned">Assigned</span></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="text-secondary small">No active assignments.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="surface-card">
+  <div class="surface-card-header"><h3 class="surface-card-title">Assignment History</h3></div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Asset</th><th>Issued</th><th>Returned</th></tr></thead>
+      <tbody>
+      {% for h in history %}
+        <tr><td>{{ h.asset.name }}</td><td>{{ h.assigned_date|date:"M d, Y" }}</td><td>{{ h.returned_date|date:"M d, Y"|default:"—" }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

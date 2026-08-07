@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Transfer Asset{% endblock %}
+{% block page_title %}Transfer Asset{% endblock %}
+{% block page_subtitle %}{{ assignment.asset.name }}{% endblock %}
+{% block content %}
+<div class="mb-4"><a href="{% url 'assets:detail' assignment.asset_id %}" class="btn btn-light btn-sm">Back</a></div>
+<div class="surface-card surface-card-body" style="max-width:560px;">
+  <form method="post">{% csrf_token %}
+    {% for field in form %}
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">{{ field.label }}</label>
+      {{ field }}
+    </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary">Record Transfer</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block page_title %}Admin Dashboard{% endblock %}
+{% block page_subtitle %}Organization-wide overview · {% now "l, F j" %}{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Active Employees" value=total_employees icon="bi-people-fill" accent="ink" subtext="Across all departments" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Attendance Today" value=attendance_rate|stringformat:"s"|add:"%" icon="bi-fingerprint" accent="amber" subtext=present_today|stringformat:"s"|add:" checked in" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Pending Leave" value=pending_leave icon="bi-calendar2-event-fill" accent="violet" subtext="Awaiting approval" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Open Vacancies" value=open_vacancies icon="bi-briefcase-fill" accent="teal" subtext=open_positions|stringformat:"s"|add:" open position(s)" link="/recruitment/vacancies/?status=open" %}</div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-xl-4">
+    <div class="surface-card h-100"><div class="surface-card-header"><h3 class="surface-card-title">Announcements</h3></div>
+    <div class="surface-card-body">{% for a in announcements %}<div class="mb-3"><div class="fw-semibold small">{{ a.title }}</div><div class="text-secondary" style="font-size:0.76rem;">{{ a.content|truncatechars:80 }}</div></div>{% empty %}<div class="text-secondary small">No announcements.</div>{% endfor %}</div></div>
+  </div>
+  <div class="col-xl-4">
+    <div class="surface-card h-100"><div class="surface-card-header"><h3 class="surface-card-title">Upcoming Birthdays</h3></div>
+    <div class="surface-card-body">{% for emp in upcoming_birthdays %}<div class="d-flex align-items-center gap-2 mb-2"><div class="avatar-circle" style="width:28px;height:28px;font-size:0.7rem;">{{ emp.user.initials }}</div><div><div class="fw-semibold small">{{ emp.full_name }}</div><div class="text-secondary" style="font-size:0.74rem;">{{ emp.date_of_birth|date:"M d" }}</div></div></div>{% empty %}<div class="text-secondary small">None in the next 30 days.</div>{% endfor %}</div></div>
+  </div>
+  <div class="col-xl-4">
+    <div class="surface-card h-100"><div class="surface-card-header"><h3 class="surface-card-title">Expiring Contracts</h3></div>
+    <div class="surface-card-body">{% for emp in expiring_contracts %}<div class="mb-2"><div class="fw-semibold small">{{ emp.full_name }}</div><div class="text-secondary" style="font-size:0.74rem;">Ends {{ emp.contract_end|date:"M d, Y" }}</div></div>{% empty %}<div class="text-secondary small">No contracts expiring soon.</div>{% endfor %}</div></div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-xl-8">
+    <div class="surface-card h-100">
+      <div class="surface-card-header">
+        <h3 class="surface-card-title">Attendance trend — last 14 days</h3>
+        <span class="chip"><i class="bi bi-fingerprint"></i> Biometric-sourced</span>
+      </div>
+      <div class="surface-card-body"><canvas id="trendChart" height="100"></canvas></div>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="surface-card h-100">
+      <div class="surface-card-header"><h3 class="surface-card-title">Gender distribution</h3></div>
+      <div class="surface-card-body"><div id="genderChart"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-xl-4">
+    <div class="surface-card h-100">
+      <div class="surface-card-header"><h3 class="surface-card-title">Headcount by department</h3></div>
+      <div class="surface-card-body"><canvas id="deptChart" height="180"></canvas></div>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="surface-card h-100">
+      <div class="surface-card-header"><h3 class="surface-card-title">Roles distribution</h3></div>
+      <div class="surface-card-body"><canvas id="roleChart" height="200"></canvas></div>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="surface-card h-100">
+      <div class="surface-card-header">
+        <h3 class="surface-card-title">Recent leave requests</h3>
+        <a href="{% url 'leave:approvals' %}" class="small">Review →</a>
+      </div>
+      <div class="surface-card-body p-0">
+        {% if recent_leave %}
+        <table class="table table-hrms mb-0"><tbody>
+        {% for lr in recent_leave %}
+          <tr><td><div class="fw-semibold" style="font-size:0.82rem;">{{ lr.employee.full_name }}</div><div class="text-secondary" style="font-size:0.74rem;">{{ lr.leave_type.name }}</div></td>
+          <td class="text-end"><span class="status-pill status-{{ lr.status }}">{{ lr.get_status_display }}</span></td></tr>
+        {% endfor %}
+        </tbody></table>
+        {% else %}<div class="empty-state"><i class="bi bi-calendar2-event"></i>No recent leave.</div>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+new Chart(document.getElementById('trendChart'), {
+  type: 'line',
+  data: {
+    labels: {{ trend_labels|safe }},
+    datasets: [
+      { label: 'Present', data: {{ trend_present|safe }}, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.08)', tension: 0.35, fill: true },
+      { label: 'Late', data: {{ trend_late|safe }}, borderColor: '#f5a524', backgroundColor: 'rgba(245,165,36,0.08)', tension: 0.35, fill: true },
+      { label: 'Absent', data: {{ trend_absent|safe }}, borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,0.06)', tension: 0.35, fill: true },
+    ]
+  },
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } }
+});
+new Chart(document.getElementById('deptChart'), {
+  type: 'doughnut',
+  data: { labels: {{ dept_labels|safe }}, datasets: [{ data: {{ dept_counts|safe }}, backgroundColor: ['#111a2e','#f5a524','#14b8a6','#8b5cf6','#f43f5e','#324269','#22c55e'], borderWidth: 0 }] },
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } }, cutout: '62%' }
+});
+new Chart(document.getElementById('roleChart'), {
+  type: 'bar',
+  data: { labels: {{ role_labels|safe }}, datasets: [{ label: 'Employees', data: {{ role_counts|safe }}, backgroundColor: '#f5a524', borderRadius: 6 }] },
+  options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } }
+});
+if (typeof ApexCharts !== 'undefined' && document.querySelector('#genderChart')) {
+  new ApexCharts(document.querySelector('#genderChart'), {
+    chart: { type: 'donut', height: 220 }, series: {{ gender_counts|safe }}, labels: {{ gender_labels|safe }},
+    colors: ['#f5a524','#14b8a6','#8b5cf6','#324269'],
+  }).render();
+}
+</script>
+{% endblock %}

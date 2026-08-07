@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Asset Reports{% endblock %}
+{% block page_title %}Asset Reports{% endblock %}
+{% block content %}
+<div class="d-flex gap-2 mb-4 flex-wrap">
+  <a href="?report=register" class="btn btn-sm {% if report == 'register' %}btn-primary{% else %}btn-light{% endif %}">Asset Register</a>
+  <a href="?report=assigned" class="btn btn-sm {% if report == 'assigned' %}btn-primary{% else %}btn-light{% endif %}">Assigned Assets</a>
+  <a href="?report=warranty" class="btn btn-sm {% if report == 'warranty' %}btn-primary{% else %}btn-light{% endif %}">Warranty Expiry</a>
+  <a href="?report={{ report }}&format=csv" class="btn btn-sm btn-light ms-auto"><i class="bi bi-download me-1"></i>Export CSV</a>
+</div>
+<div class="surface-card">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0 datatable">
+      <thead><tr><th>Asset #</th><th>Name</th><th>Category</th><th>Status</th><th>Branch</th><th>Warranty End</th></tr></thead>
+      <tbody>
+      {% for a in assets %}
+        <tr>
+          <td>{{ a.asset_number }}</td>
+          <td>{{ a.name }}</td>
+          <td>{{ a.category.name }}</td>
+          <td>{{ a.get_status_display }}</td>
+          <td>{{ a.branch.name|default:"—" }}</td>
+          <td>{{ a.warranty_end|date:"M d, Y"|default:"—" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

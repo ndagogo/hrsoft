@@ -1,0 +1,18 @@
+{% extends "recruitment/careers_base.html" %}
+{% block title %}{{ vacancy.title }} — closed{% endblock %}
+{% block content %}
+<div class="text-center py-5">
+  <i class="bi bi-briefcase display-4 text-secondary"></i>
+  <h1 class="h3 mt-3">{{ vacancy.title }}</h1>
+  {% if reason == 'filled' %}
+  <p class="text-secondary col-md-6 mx-auto">This position has been filled and is no longer accepting applications.</p>
+  {% elif reason == 'expired' %}
+  <p class="text-secondary col-md-6 mx-auto">The application deadline for this role has passed.</p>
+  {% elif reason == 'unavailable' %}
+  <p class="text-secondary col-md-6 mx-auto">This role is not currently listed on our public careers page.</p>
+  {% else %}
+  <p class="text-secondary col-md-6 mx-auto">This opening is closed and is no longer accepting applications.</p>
+  {% endif %}
+  <a href="{% url 'recruitment:careers' %}" class="btn btn-apply mt-2">Browse open roles</a>
+</div>
+{% endblock %}

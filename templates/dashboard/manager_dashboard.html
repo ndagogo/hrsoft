@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Manager Dashboard{% endblock %}
+{% block page_title %}{{ department.name|default:"Team" }} Dashboard{% endblock %}
+{% block page_subtitle %}Your team's attendance & leave · {% now "l, F j" %}{% endblock %}
+
+{% block content %}
+{% if not department %}
+<div class="empty-state surface-card py-5"><i class="bi bi-diagram-3"></i>You're not assigned to a department yet. Ask an Admin to set this on your employee profile.</div>
+{% else %}
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Team Size" value=team_count icon="bi-people-fill" accent="ink" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Present Today" value=present_today icon="bi-check-circle-fill" accent="green" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Late Today" value=late_today icon="bi-clock-fill" accent="amber" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Pending Leave" value=pending_leave icon="bi-calendar2-event-fill" accent="violet" %}</div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-xl-7">
+    <div class="surface-card h-100">
+      <div class="surface-card-header"><h3 class="surface-card-title">Team attendance — last 14 days</h3></div>
+      <div class="surface-card-body"><canvas id="trendChart" height="110"></canvas></div>
+    </div>
+  </div>
+  <div class="col-xl-5">
+    <div class="surface-card h-100">
+      <div class="surface-card-header">
+        <h3 class="surface-card-title">Pending team requests</h3>
+        <a href="{% url 'leave:approvals' %}" class="small">Review →</a>
+      </div>
+      <div class="surface-card-body p-0">
+        {% if pending_requests %}
+        <table class="table table-hrms mb-0">
+          <tbody>
+          {% for lr in pending_requests %}
+            <tr>
+              <td>
+                <div class="fw-semibold" style="font-size:0.82rem;">{{ lr.employee.full_name }}</div>
+                <div class="text-secondary" style="font-size:0.74rem;">{{ lr.leave_type.name }} · {{ lr.start_date|date:"M j" }}–{{ lr.end_date|date:"M j" }}</div>
+              </td>
+              <td class="text-end"><span class="status-pill status-pending">Pending</span></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state"><i class="bi bi-check2-circle"></i>Nothing pending.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="surface-card">
+  <div class="surface-card-header"><h3 class="surface-card-title">Team roster</h3></div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Employee</th><th>Designation</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for emp in team_members %}
+        <tr>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="avatar-circle" style="background:var(--ink-100); color:var(--ink-900);">{{ emp.user.initials }}</div>
+              <div>
+                <div class="fw-semibold" style="font-size:0.84rem;">{{ emp.full_name }}</div>
+                <div class="text-secondary" style="font-size:0.74rem;">{{ emp.employee_id }}</div>
+              </div>
+            </div>
+          </td>
+          <td>{{ emp.designation.title|default:"—" }}</td>
+          <td><span class="status-pill status-{{ emp.status }}">{{ emp.get_status_display }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+new Chart(document.getElementById('trendChart'), {
+  type: 'line',
+  data: {
+    labels: {{ trend_labels|safe }},
+    datasets: [
+      { label: 'Present', data: {{ trend_present|safe }}, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.08)', tension: 0.35, fill: true },
+      { label: 'Late', data: {{ trend_late|safe }}, borderColor: '#f5a524', backgroundColor: 'rgba(245,165,36,0.08)', tension: 0.35, fill: true },
+      { label: 'Absent', data: {{ trend_absent|safe }}, borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,0.06)', tension: 0.35, fill: true },
+    ]
+  },
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f3f9' } }, x: { grid: { display: false } } } }
+});
+</script>
+{% endblock %}

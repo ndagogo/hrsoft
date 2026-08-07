@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Permissions{% endblock %}
+{% block page_title %}Permissions Catalog{% endblock %}
+{% block page_subtitle %}The full set of privileges that can be assigned to roles{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h2 class="section-heading">All permissions</h2>
+    <p class="section-subtext mb-0">Built-in permissions cover every module. Add custom ones for bespoke workflows.</p>
+  </div>
+  <button class="btn btn-amber" data-bs-toggle="modal" data-bs-target="#newPermModal"><i class="bi bi-key me-1"></i>New Permission</button>
+</div>
+
+<div class="surface-card">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Name</th><th>Codename</th><th>Category</th><th>Description</th><th>Used by roles</th></tr></thead>
+      <tbody>
+      {% for perm in permissions %}
+        <tr>
+          <td class="fw-semibold">{{ perm.name }}</td>
+          <td><code>{{ perm.codename }}</code></td>
+          <td><span class="chip text-capitalize">{{ perm.category }}</span></td>
+          <td class="text-secondary" style="font-size:0.82rem;">{{ perm.description|default:"—" }}</td>
+          <td>{{ perm.roles.count }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5"><div class="empty-state"><i class="bi bi-key"></i>No permissions yet.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="newPermModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post">
+        {% csrf_token %}
+        <div class="modal-header"><h5 class="modal-title font-display">New permission</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-3"><label class="form-label small fw-semibold">Name</label>{{ form.name }}</div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Codename</label>{{ form.codename }}</div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Category</label>{{ form.category }}</div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Description</label>{{ form.description }}</div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-amber">Create</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

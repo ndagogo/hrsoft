@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Employees{% endblock %}
+{% block page_title %}Employees{% endblock %}
+{% block page_subtitle %}{{ total_count }} record{{ total_count|pluralize }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+  <div>
+    <h2 class="section-heading">Employee directory</h2>
+    {% if org_wide_directory %}
+    <p class="section-subtext mb-0">Search, filter, and manage every staff record in one place.</p>
+    {% elif scope_label %}
+    <p class="section-subtext mb-0">Showing staff in <strong>{{ scope_label }}</strong> only — your department scope.</p>
+    {% else %}
+    <p class="section-subtext mb-0">Showing staff in your department only.</p>
+    {% endif %}
+  </div>
+  {% if 'manage_employees' in perms_set %}
+  <div class="d-flex gap-2 flex-wrap">
+    <div class="btn-group">
+      <button type="button" class="btn btn-light dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="bi bi-download me-1"></i> Export
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="{% url 'employees:export' %}?format=csv{% if search %}&q={{ search }}{% endif %}{% if selected_department %}&department={{ selected_department }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}"><i class="bi bi-filetype-csv me-2"></i>CSV</a></li>
+        <li><a class="dropdown-item" href="{% url 'employees:export' %}?format=xlsx{% if search %}&q={{ search }}{% endif %}{% if selected_department %}&department={{ selected_department }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}"><i class="bi bi-file-earmark-excel me-2"></i>Excel</a></li>
+      </ul>
+    </div>
+    <a href="{% url 'employees:import' %}" class="btn btn-light">
+      <i class="bi bi-upload me-1"></i> Import
+    </a>
+    <button class="btn btn-amber" data-modal-url="{% url 'employees:create' %}?modal=1" data-modal-title="Add employee">
+      <i class="bi bi-person-plus-fill me-1"></i> Add Employee
+    </button>
+  </div>
+  {% elif 'view_employees' in perms_set %}
+  <div class="btn-group">
+    <button type="button" class="btn btn-light dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+      <i class="bi bi-download me-1"></i> Export
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end">
+      <li><a class="dropdown-item" href="{% url 'employees:export' %}?format=csv{% if search %}&q={{ search }}{% endif %}{% if selected_department %}&department={{ selected_department }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}"><i class="bi bi-filetype-csv me-2"></i>CSV</a></li>
+      <li><a class="dropdown-item" href="{% url 'employees:export' %}?format=xlsx{% if search %}&q={{ search }}{% endif %}{% if selected_department %}&department={{ selected_department }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}"><i class="bi bi-file-earmark-excel me-2"></i>Excel</a></li>
+    </ul>
+  </div>
+  {% endif %}
+</div>
+
+<div class="surface-card mb-4">
+  <div class="surface-card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">Search</label>
+        <input type="text" name="q" value="{{ search }}" class="form-control" placeholder="Name, ID or email">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold">Department</label>
+        <select name="department" class="form-select" {% if not org_wide_directory and departments|length <= 1 %}disabled{% endif %}>
+          {% if org_wide_directory %}
+          <option value="">All departments</option>
+          {% endif %}
+          {% for d in departments %}
+          <option value="{{ d.id }}" {% if selected_department == d.id|stringformat:"s" or not org_wide_directory and not selected_department %}selected{% endif %}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+        {% if not org_wide_directory and departments|length <= 1 %}
+        <input type="hidden" name="department" value="{% for d in departments %}{{ d.id }}{% endfor %}">
+        {% endif %}
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold">Status</label>
+        <select name="status" class="form-select">
+          <option value="">Any status</option>
+          <option value="active" {% if selected_status == "active" %}selected{% endif %}>Active</option>
+          <option value="on_leave" {% if selected_status == "on_leave" %}selected{% endif %}>On Leave</option>
+          <option value="suspended" {% if selected_status == "suspended" %}selected{% endif %}>Suspended</option>
+          <option value="terminated" {% if selected_status == "terminated" %}selected{% endif %}>Terminated</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-ink w-100"><i class="bi bi-search me-1"></i>Filter</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="surface-card">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead>
+        <tr>
+          <th>Employee</th>
+          <th>ID</th>
+          <th>Department</th>
+          <th>Branch</th>
+          <th>Designation</th>
+          <th>Joined</th>
+          <th>Status</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for emp in page_obj %}
+        <tr>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              {% if emp.photo_url %}
+              <img src="{{ emp.photo_url }}" alt="" style="width:32px;height:32px;object-fit:cover;border-radius:50%;">
+              {% else %}
+              <div class="avatar-circle" style="background:var(--ink-100); color:var(--ink-900);">{{ emp.user.initials }}</div>
+              {% endif %}
+              <div>
+                <div class="fw-semibold">{{ emp.full_name }}</div>
+                <div class="text-secondary" style="font-size:0.76rem;">{{ emp.user.email }}</div>
+              </div>
+            </div>
+          </td>
+          <td>{{ emp.employee_id }}</td>
+          <td>{{ emp.department.name|default:"—" }}</td>
+          <td class="small">{{ emp.branch_names }}</td>
+          <td>{{ emp.designation.title|default:"—" }}</td>
+          <td>{{ emp.date_joined|date:"M d, Y" }}</td>
+          <td><span class="status-pill status-{{ emp.status }}">{{ emp.get_status_display }}</span></td>
+          <td class="text-end">
+            <a href="{% url 'employees:detail' emp.pk %}" class="btn btn-sm btn-light"><i class="bi bi-eye"></i></a>
+            {% if 'manage_employees' in perms_set %}
+            <button class="btn btn-sm btn-light" data-modal-url="{% url 'employees:edit' emp.pk %}?modal=1" data-modal-title="Edit employee"><i class="bi bi-pencil"></i></button>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7"><div class="empty-state"><i class="bi bi-people"></i>No employees match these filters.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page_obj.has_other_pages %}
+  <div class="surface-card-body border-top">
+    <nav>
+      <ul class="pagination mb-0 justify-content-center">
+        {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>{% endif %}
+        <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+        {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a></li>{% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Add applicant{% endblock %}
+{% block page_title %}Add applicant{% endblock %}
+{% block page_subtitle %}Manual application entry{% endblock %}
+{% block content %}
+<div class="mb-4"><a href="{% url 'recruitment:applications' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a></div>
+<div class="surface-card surface-card-body" style="max-width:900px;">
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
+    <div class="row g-3">
+      {% for field in form %}
+      <div class="{% if field.name == 'cover_letter' %}col-12{% else %}col-md-6{% endif %}">
+        <label class="form-label small fw-semibold">{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="mt-4"><button type="submit" class="btn btn-primary">Create application</button></div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Verify Leave{% endblock %}
+{% block page_title %}Leave verification{% endblock %}
+{% block page_subtitle %}Reference {{ document.reference_number }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="surface-card surface-card-body">
+      <div class="text-center mb-3">
+        <span class="chip" style="background:rgba(34,197,94,0.12);color:#15803d;"><i class="bi bi-shield-check"></i> Verified leave approval</span>
+      </div>
+      <div class="small">
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Reference</span><span class="fw-semibold font-monospace">{{ document.reference_number }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Employee</span><span class="fw-semibold">{{ leave_request.employee.full_name }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Leave type</span><span>{{ leave_request.leave_type.name }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Period</span><span>{{ leave_request.start_date|date:"M d, Y" }} – {{ leave_request.end_date|date:"M d, Y" }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Stand-in</span><span>{{ leave_request.stand_in_employee.full_name|default:"—" }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Status</span><span class="status-pill status-approved">Approved</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Generated</span><span>{{ document.generated_at|date:"M d, Y H:i" }}</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

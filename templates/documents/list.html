@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Documents{% endblock %}
+{% block page_title %}Document Management{% endblock %}
+{% block page_subtitle %}Contracts, certificates & employee files{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-4 flex-wrap gap-2">
+  <a href="{% url 'documents:my' %}" class="btn btn-light btn-sm"><i class="bi bi-person-lines-fill me-1"></i>My documents</a>
+</div>
+<div class="surface-card">
+  <div class="surface-card-header"><h3 class="surface-card-title">Documents</h3></div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0 datatable">
+      <thead><tr><th>Title</th><th>Category</th><th>Employee</th><th>Uploaded</th><th>Confidential</th><th></th></tr></thead>
+      <tbody>
+      {% for d in documents %}
+        <tr>
+          <td class="fw-semibold">{{ d.title }}</td>
+          <td><span class="chip">{{ d.get_category_display }}</span></td>
+          <td>{% if d.employee %}<a href="{% url 'documents:employee' d.employee_id %}">{{ d.employee.full_name }}</a>{% else %}Company-wide{% endif %}</td>
+          <td>{{ d.created_at|date:"M d, Y" }}</td>
+          <td>{% if d.is_confidential %}<i class="bi bi-lock-fill text-danger"></i>{% else %}—{% endif %}</td>
+          <td>
+            {% if d.file %}
+            <a href="{% url 'documents:view' d.pk %}" class="btn btn-sm btn-light" title="View"><i class="bi bi-eye"></i></a>
+            <a href="{% url 'documents:download' d.pk %}" class="btn btn-sm btn-light" title="Download"><i class="bi bi-download"></i></a>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6"><div class="empty-state"><i class="bi bi-folder"></i>No documents uploaded.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

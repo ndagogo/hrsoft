@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Offers{% endblock %}
+{% block page_title %}Offers{% endblock %}
+{% block page_subtitle %}Offer letters{% endblock %}
+{% block content %}
+<form method="get" class="mb-4">
+  <select name="status" class="form-select form-select-sm" style="max-width:200px;" onchange="this.form.submit()">
+    <option value="">All statuses</option>
+    {% for val, label in statuses %}<option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+</form>
+<div class="surface-card">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0 datatable">
+      <thead><tr><th>Candidate</th><th>Role</th><th>Salary</th><th>Start</th><th>Status</th><th>Issued</th></tr></thead>
+      <tbody>
+      {% for o in offers %}
+      <tr>
+        <td><a href="{% url 'recruitment:application_detail' o.application_id %}">{{ o.application.full_name }}</a></td>
+        <td>{{ o.application.vacancy.title }}</td>
+        <td>{{ o.currency }} {{ o.salary_offered }}</td>
+        <td>{{ o.start_date|date:"M d, Y" }}</td>
+        <td><span class="status-pill status-{{ o.status }}">{{ o.get_status_display }}</span></td>
+        <td>{{ o.issued_at|date:"M d, Y"|default:"—" }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

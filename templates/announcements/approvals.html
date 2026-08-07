@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Announcement approvals{% endblock %}
+{% block page_title %}Announcement approvals{% endblock %}
+{% block page_subtitle %}{{ pending|length }} pending{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-4">
+  <a href="{% url 'announcements:list' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Announcements</a>
+  {% if 'create_announcement' in perms_set %}
+  <a href="{% url 'announcements:create' %}" class="btn btn-amber btn-sm"><i class="bi bi-plus-lg me-1"></i>New announcement</a>
+  {% endif %}
+</div>
+
+<div class="surface-card mb-4">
+  <div class="surface-card-header"><h3 class="surface-card-title">Pending approval</h3></div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Title</th><th>Author</th><th>Audience</th><th>Priority</th><th>Attachments</th><th>Submitted</th><th class="text-end">Decision</th></tr></thead>
+      <tbody>
+      {% for a in pending %}
+        <tr>
+          <td>
+            <a href="{% url 'announcements:detail' a.pk %}" class="fw-semibold text-decoration-none">{{ a.title }}</a>
+            <div class="text-secondary" style="font-size:0.74rem;">{{ a.content|truncatechars:80 }}</div>
+          </td>
+          <td>{% if a.author %}{{ a.author.get_full_name|default:a.author.username }}{% else %}—{% endif %}</td>
+          <td><span class="chip">{{ a.audience_label }}</span></td>
+          <td><span class="chip">{{ a.get_priority_display }}</span></td>
+          <td>{{ a.attachments.count }}</td>
+          <td>{% if a.submitted_at %}{{ a.submitted_at|date:"M d, Y H:i" }}{% else %}{{ a.created_at|date:"M d, Y H:i" }}{% endif %}</td>
+          <td class="text-end">
+            <form method="post" action="{% url 'announcements:review' a.pk 'approve' %}" class="d-inline">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-amber"><i class="bi bi-check-lg"></i></button>
+            </form>
+            <form method="post" action="{% url 'announcements:review' a.pk 'reject' %}" class="d-inline" data-confirm="Reject this announcement?">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-light text-danger"><i class="bi bi-x-lg"></i></button>
+            </form>
+            <a href="{% url 'announcements:detail' a.pk %}" class="btn btn-sm btn-light"><i class="bi bi-eye"></i></a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7"><div class="empty-state"><i class="bi bi-clipboard-check"></i>No pending announcements.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="surface-card">
+  <div class="surface-card-header"><h3 class="surface-card-title">Recent decisions</h3></div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Title</th><th>Status</th><th>Author</th><th>Reviewed by</th><th>When</th></tr></thead>
+      <tbody>
+      {% for a in history %}
+        <tr>
+          <td><a href="{% url 'announcements:detail' a.pk %}" class="text-decoration-none">{{ a.title }}</a></td>
+          <td><span class="status-pill status-{{ a.status }}">{{ a.get_status_display }}</span></td>
+          <td>{% if a.author %}{{ a.author.get_full_name|default:a.author.username }}{% else %}—{% endif %}</td>
+          <td>{% if a.approved_by %}{{ a.approved_by.get_full_name|default:a.approved_by.username }}{% else %}—{% endif %}</td>
+          <td>{{ a.approved_at|date:"M d, Y H:i"|default:"—" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5"><div class="empty-state py-3"><i class="bi bi-clock-history"></i>No decisions yet.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Audit Log{% endblock %}
+{% block page_title %}Audit Trail{% endblock %}
+{% block page_subtitle %}Full change history with field-level diffs{% endblock %}
+{% block content %}
+<div class="surface-card">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0 datatable">
+      <thead><tr><th>User</th><th>Action</th><th>Object</th><th>Changes</th><th>IP</th><th>When</th></tr></thead>
+      <tbody>
+      {% for log in page_obj %}
+        <tr>
+          <td class="fw-semibold small">{{ log.user.get_full_name|default:log.user.username|default:"System" }}</td>
+          <td><span class="chip">{{ log.action }}</span></td>
+          <td>
+            {% if log.model_name %}<div class="small text-secondary">{{ log.model_name }}</div>{% endif %}
+            <div style="font-size:0.82rem;">{{ log.object_repr|default:log.path|truncatechars:40 }}</div>
+          </td>
+          <td style="font-size:0.76rem; max-width:300px;">
+            {% if log.change_summary %}
+              <div class="text-secondary">{{ log.change_summary|truncatechars:200 }}</div>
+            {% elif log.has_diff %}
+              <div class="text-secondary">Field changes recorded</div>
+            {% else %}
+              <span class="text-secondary">{{ log.path|truncatechars:60 }}</span>
+            {% endif %}
+          </td>
+          <td class="text-secondary small">{{ log.ip_address|default:"—" }}</td>
+          <td class="text-secondary small">{{ log.timestamp|date:"M d, H:i:s" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6"><div class="empty-state"><i class="bi bi-list-check"></i>No audit entries yet.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page_obj.has_other_pages %}
+  <div class="surface-card-body border-top">
+    <nav><ul class="pagination mb-0 justify-content-center">
+      {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>{% endif %}
+      <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+      {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a></li>{% endif %}
+    </ul></nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

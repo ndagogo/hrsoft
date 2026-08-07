@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Report Builder{% endblock %}
+{% block page_title %}Custom Report Builder{% endblock %}
+{% block content %}
+<div class="surface-card mx-auto" style="max-width:640px;"><div class="surface-card-body">
+<form method="post">{% csrf_token %}
+  <div class="mb-3"><label class="form-label fw-semibold">Report name</label><input type="text" name="name" class="form-control" required></div>
+  <div class="mb-3"><label class="form-label fw-semibold">Report type</label>
+    <select name="report_type" class="form-select">{% for val, label in report_types %}<option value="{{ val }}">{{ label }}</option>{% endfor %}</select>
+  </div>
+  <div class="mb-3"><label class="form-label fw-semibold">Description</label><textarea name="description" class="form-control" rows="2"></textarea></div>
+  <div class="form-check mb-3"><input type="checkbox" name="is_shared" class="form-check-input" id="shared"><label class="form-check-label" for="shared">Share with all report viewers</label></div>
+  <button type="submit" class="btn btn-amber">Create report</button>
+  <a href="{% url 'reports:hub' %}" class="btn btn-light">Cancel</a>
+</form></div></div>
+{% endblock %}

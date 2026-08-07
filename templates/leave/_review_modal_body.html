@@ -1,0 +1,23 @@
+<div class="mb-3 p-3 rounded" style="background:var(--ink-50); font-size:0.85rem;">
+  <div class="fw-semibold mb-1">{{ leave_request.employee.full_name }}</div>
+  <div class="text-secondary">{{ leave_request.leave_type.name }} · {{ leave_request.start_date|date:"M d" }} – {{ leave_request.end_date|date:"M d, Y" }}</div>
+  <div class="mt-2"><span class="text-secondary">Stand-in:</span> <strong>{{ leave_request.stand_in_employee.full_name|default:"—" }}</strong>
+    {% if leave_request.stand_in_accepted %}<span class="chip ms-1" style="background:rgba(34,197,94,0.12);color:#15803d;">Accepted ✓</span>
+    {% else %}<span class="chip ms-1" style="background:rgba(245,165,36,0.14);">Not accepted yet</span>{% endif %}
+  </div>
+  {% if not leave_request.stand_in_accepted %}
+  <div class="text-danger small mt-2"><i class="bi bi-exclamation-circle me-1"></i>Cannot approve until stand-in accepts.</div>
+  {% endif %}
+</div>
+<form method="post" action="{% url 'leave:review' leave_request.pk %}">
+  {% csrf_token %}
+  <div class="mb-3">{{ form.decision }}</div>
+  <div class="mb-3">
+    <label class="form-label small fw-semibold">Note</label>
+    {{ form.review_note }}
+  </div>
+  <div class="d-flex justify-content-end gap-2">
+    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+    <button type="submit" class="btn btn-amber" {% if not leave_request.stand_in_accepted %}disabled{% endif %}>Submit decision</button>
+  </div>
+</form>

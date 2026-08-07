@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Dashboard{% endblock %} · {{ COMPANY_NAME }} HR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css">
+<link rel="stylesheet" href="{% static 'css/hrms.css' %}">
+{% block extra_css %}{% endblock %}
+</head>
+<body>
+<div class="app-shell">
+
+  <aside class="app-sidebar" id="appSidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-mark">HR</div>
+      <div>
+        <div class="sidebar-brand-text">{{ COMPANY_NAME }}</div>
+        <div class="sidebar-brand-sub">Enterprise HRMS</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="{% url 'dashboard:router' %}" class="sidebar-link {% if request.resolver_match.app_name == 'dashboard' %}active{% endif %}">
+        <i class="bi bi-grid-1x2-fill"></i> Dashboard
+      </a>
+
+      <div class="sidebar-section-label">Core</div>
+      {% if 'view_employees' in perms_set %}
+      <a href="{% url 'employees:list' %}" class="sidebar-link {% if request.resolver_match.app_name == 'employees' and request.resolver_match.url_name == 'list' %}active{% endif %}">
+        <i class="bi bi-people-fill"></i> Employees
+      </a>
+      {% endif %}
+      {% if 'view_organization' in perms_set or 'manage_organization' in perms_set %}
+      <a href="{% url 'organization:overview' %}" class="sidebar-link {% if request.resolver_match.app_name == 'organization' %}active{% endif %}">
+        <i class="bi bi-building"></i> Organization
+      </a>
+      {% endif %}
+      {% if 'manage_departments' in perms_set %}
+      <a href="{% url 'employees:departments' %}" class="sidebar-link {% if request.resolver_match.url_name == 'departments' %}active{% endif %}">
+        <i class="bi bi-diagram-3-fill"></i> Departments
+      </a>
+      {% endif %}
+
+      <div class="sidebar-section-label">Time & Attendance</div>
+      {% if 'view_attendance' in perms_set %}
+      <a href="{% url 'attendance:list' %}" class="sidebar-link {% if request.resolver_match.app_name == 'attendance' and request.resolver_match.url_name == 'list' %}active{% endif %}">
+        <i class="bi bi-calendar-check-fill"></i> Attendance
+      </a>
+      {% endif %}
+      <a href="{% url 'attendance:my_attendance' %}" class="sidebar-link {% if request.resolver_match.url_name == 'my_attendance' %}active{% endif %}">
+        <i class="bi bi-fingerprint"></i> My Attendance
+      </a>
+      {% if 'manage_devices' in perms_set %}
+      <a href="{% url 'attendance:devices' %}" class="sidebar-link {% if request.resolver_match.url_name == 'devices' %}active{% endif %}">
+        <i class="bi bi-cpu-fill"></i> Biometric Devices
+      </a>
+      {% endif %}
+
+      <div class="sidebar-section-label">HR Operations</div>
+      <a href="{% url 'leave:my_requests' %}" class="sidebar-link {% if request.resolver_match.url_name == 'my_requests' %}active{% endif %}">
+        <i class="bi bi-calendar2-event-fill"></i> My Leave
+      </a>
+      <a href="{% url 'leave:stand_in' %}" class="sidebar-link {% if request.resolver_match.url_name == 'stand_in' or request.resolver_match.url_name == 'stand_in_respond' %}active{% endif %}">
+        <i class="bi bi-person-check"></i> Stand-in Requests
+      </a>
+      {% if 'approve_leave' in perms_set %}
+      <a href="{% url 'leave:approvals' %}" class="sidebar-link {% if request.resolver_match.url_name == 'approvals' %}active{% endif %}">
+        <i class="bi bi-clipboard-check-fill"></i> Leave Approvals
+      </a>
+      {% endif %}
+      {% if 'view_recruitment' in perms_set %}
+      <a href="{% url 'recruitment:dashboard' %}" class="sidebar-link {% if request.resolver_match.app_name == 'recruitment' and request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+        <i class="bi bi-briefcase-fill"></i> Recruitment
+      </a>
+      <a href="{% url 'recruitment:pipeline' %}" class="sidebar-link {% if request.resolver_match.url_name == 'pipeline' %}active{% endif %}">
+        <i class="bi bi-kanban"></i> Hiring Pipeline
+      </a>
+      <a href="{% url 'recruitment:vacancies' %}" class="sidebar-link {% if request.resolver_match.url_name == 'vacancies' or request.resolver_match.url_name == 'vacancy_detail' %}active{% endif %}">
+        <i class="bi bi-postcard"></i> Vacancies
+      </a>
+      <a href="{% url 'recruitment:applications' %}" class="sidebar-link {% if request.resolver_match.url_name == 'applications' or request.resolver_match.url_name == 'application_detail' %}active{% endif %}">
+        <i class="bi bi-person-lines-fill"></i> Applications
+      </a>
+      <a href="{% url 'recruitment:interviews' %}" class="sidebar-link {% if request.resolver_match.url_name == 'interviews' or request.resolver_match.url_name == 'interview_detail' %}active{% endif %}">
+        <i class="bi bi-calendar-event"></i> Interviews
+      </a>
+      <a href="{% url 'recruitment:offers' %}" class="sidebar-link {% if request.resolver_match.url_name == 'offers' %}active{% endif %}">
+        <i class="bi bi-envelope-paper"></i> Offers
+      </a>
+      <a href="{% url 'recruitment:requisitions' %}" class="sidebar-link {% if 'requisition' in request.resolver_match.url_name %}active{% endif %}">
+        <i class="bi bi-file-earmark-text"></i> Requisitions
+      </a>
+      {% endif %}
+      {% if 'view_performance' in perms_set %}
+      <a href="{% url 'performance:overview' %}" class="sidebar-link {% if request.resolver_match.app_name == 'performance' %}active{% endif %}">
+        <i class="bi bi-star-fill"></i> Performance
+      </a>
+      {% endif %}
+      {% if 'view_training' in perms_set %}
+      <a href="{% url 'training:overview' %}" class="sidebar-link {% if request.resolver_match.app_name == 'training' %}active{% endif %}">
+        <i class="bi bi-mortarboard-fill"></i> Training
+      </a>
+      {% endif %}
+
+      <div class="sidebar-section-label">Finance & Assets</div>
+      {% if 'view_payroll' in perms_set %}
+      <a href="{% url 'payroll:periods' %}" class="sidebar-link {% if request.resolver_match.url_name == 'periods' %}active{% endif %}">
+        <i class="bi bi-cash-coin"></i> Payroll
+      </a>
+      {% endif %}
+      <a href="{% url 'payroll:my_payslips' %}" class="sidebar-link {% if request.resolver_match.url_name == 'my_payslips' %}active{% endif %}">
+        <i class="bi bi-receipt"></i> My Payslips
+      </a>
+      {% if 'view_assets' in perms_set %}
+      <a href="{% url 'assets:dashboard' %}" class="sidebar-link {% if request.resolver_match.app_name == 'assets' %}active{% endif %}">
+        <i class="bi bi-laptop"></i> Assets
+      </a>
+      <a href="{% url 'assets:my' %}" class="sidebar-link {% if request.resolver_match.url_name == 'my' %}active{% endif %}">
+        <i class="bi bi-box-seam"></i> My Assets
+      </a>
+      {% endif %}
+
+      <div class="sidebar-section-label">More</div>
+      {% if 'view_documents' in perms_set %}
+      <a href="{% url 'documents:list' %}" class="sidebar-link {% if request.resolver_match.app_name == 'documents' and request.resolver_match.url_name == 'list' %}active{% endif %}">
+        <i class="bi bi-folder-fill"></i> Documents
+      </a>
+      {% endif %}
+      <a href="{% url 'documents:my' %}" class="sidebar-link {% if request.resolver_match.url_name == 'my' %}active{% endif %}">
+        <i class="bi bi-file-earmark-person"></i> My Documents
+      </a>
+      {% if 'view_visitors' in perms_set %}
+      <a href="{% url 'visitors:list' %}" class="sidebar-link {% if request.resolver_match.app_name == 'visitors' %}active{% endif %}">
+        <i class="bi bi-person-badge-fill"></i> Visitors
+      </a>
+      {% endif %}
+      {% if 'view_reports' in perms_set %}
+      <a href="{% url 'reports:hub' %}" class="sidebar-link {% if request.resolver_match.app_name == 'reports' %}active{% endif %}">
+        <i class="bi bi-bar-chart-fill"></i> Reports
+      </a>
+      {% endif %}
+      <a href="{% url 'selfservice:hub' %}" class="sidebar-link {% if request.resolver_match.app_name == 'selfservice' %}active{% endif %}">
+        <i class="bi bi-person-workspace"></i> Self-Service
+      </a>
+      <a href="{% url 'announcements:list' %}" class="sidebar-link {% if request.resolver_match.app_name == 'announcements' %}active{% endif %}">
+        <i class="bi bi-megaphone-fill"></i> Announcements
+      </a>
+      {% if 'manage_system_settings' in perms_set %}
+      <a href="{% url 'system_settings:overview' %}" class="sidebar-link {% if request.resolver_match.app_name == 'system_settings' %}active{% endif %}">
+        <i class="bi bi-gear-fill"></i> Settings
+      </a>
+      {% endif %}
+
+      {% if request.user.is_superuser or current_role == 'Admin' %}
+      <div class="sidebar-section-label">Administration</div>
+      <a href="{% url 'rbac:roles' %}" class="sidebar-link {% if request.resolver_match.url_name == 'roles' %}active{% endif %}">
+        <i class="bi bi-shield-lock-fill"></i> Roles & Permissions
+      </a>
+      <a href="{% url 'rbac:audit_log' %}" class="sidebar-link {% if request.resolver_match.url_name == 'audit_log' %}active{% endif %}">
+        <i class="bi bi-list-check"></i> Audit Log
+      </a>
+      <a href="/admin/" class="sidebar-link"><i class="bi bi-sliders"></i> Django Admin</a>
+      {% endif %}
+    </nav>
+
+    <div class="sidebar-footer">
+      <a href="{% url 'accounts:logout' %}" class="sidebar-link" style="opacity:0.7;">
+        <i class="bi bi-box-arrow-left"></i> Sign out
+      </a>
+    </div>
+  </aside>
+
+  <div class="app-main">
+    <header class="app-topbar">
+      <div class="d-flex align-items-center gap-3 flex-grow-1">
+        <button class="btn btn-sm btn-glass d-lg-none" id="sidebarToggle"><i class="bi bi-list"></i></button>
+        <form class="global-search d-none d-md-flex" action="{% url 'core:search' %}" method="get" id="globalSearchForm">
+          <i class="bi bi-search"></i>
+          <input type="search" name="q" placeholder="Search employees, documents…" autocomplete="off" id="globalSearchInput">
+        </form>
+        <div class="d-none d-lg-block">
+          <div class="fw-semibold" style="font-size:0.95rem;">{% block page_title %}{% endblock %}</div>
+          <div class="section-subtext" style="font-size:0.78rem;">{% block page_subtitle %}{% endblock %}</div>
+        </div>
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <div class="live-clock d-none d-md-block" id="liveClock">--:--</div>
+        <button class="btn btn-sm btn-glass" id="themeToggle" title="Toggle theme"><i class="bi bi-moon-stars-fill"></i></button>
+        <div class="dropdown">
+          <button class="btn btn-sm btn-glass position-relative" data-bs-toggle="dropdown" id="notifBellBtn">
+            <i class="bi bi-bell-fill"></i>
+            <span class="notif-badge{% if not unread_notifications %} d-none{% endif %}" id="notifBadge"{% if unread_notifications %} data-count="{{ unread_notifications }}"{% else %} data-count="0"{% endif %}>{% if unread_notifications %}{{ unread_notifications }}{% endif %}</span>
+          </button>
+          <div class="dropdown-menu dropdown-menu-end notif-dropdown p-0">
+            <div class="notif-dropdown-header d-flex justify-content-between align-items-center">
+              <span>Notifications</span>
+              {% if unread_notifications %}<span class="text-secondary small">{{ unread_notifications }} unread</span>{% endif %}
+            </div>
+            <div class="notif-dropdown-body">
+              {% for n in recent_notifications %}
+              <a href="{% url 'notifications:open' n.pk %}" class="notif-item {% if not n.is_read %}unread{% endif %}" data-notif-id="{{ n.pk }}" data-notif-read="{{ n.is_read|yesno:'1,0' }}">
+                <div class="fw-semibold small">{{ n.title }}</div>
+                <div class="text-secondary" style="font-size:0.74rem;">{{ n.message|truncatechars:60 }}</div>
+                <div class="text-secondary" style="font-size:0.68rem;">{{ n.created_at|timesince }} ago</div>
+              </a>
+              {% empty %}
+              <div class="p-3 text-secondary small text-center">No notifications</div>
+              {% endfor %}
+            </div>
+            <div class="notif-dropdown-footer">
+              <a href="{% url 'notifications:list' %}">View all</a>
+              <form method="post" action="{% url 'notifications:mark_all_read' %}" class="d-inline" id="markAllReadForm">{% csrf_token %}<button type="submit" class="btn btn-link btn-sm p-0">Mark all read</button></form>
+            </div>
+          </div>
+        </div>
+        <span class="role-badge d-none d-sm-inline">{{ current_role|default:"Unassigned" }}</span>
+        <div class="dropdown">
+          <a class="d-flex align-items-center gap-2 text-decoration-none dropdown-toggle topbar-user" href="#" data-bs-toggle="dropdown">
+            <div class="avatar-circle">{{ request.user.initials }}</div>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><span class="dropdown-item-text fw-semibold">{{ request.user.get_full_name|default:request.user.username }}</span></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{% url 'accounts:profile' %}"><i class="bi bi-person me-2"></i>Profile</a></li>
+            <li><a class="dropdown-item" href="{% url 'accounts:login_history' %}"><i class="bi bi-clock-history me-2"></i>Login History</a></li>
+            <li><a class="dropdown-item" href="{% url 'accounts:change_password' %}"><i class="bi bi-key me-2"></i>Change Password</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item text-danger" href="{% url 'accounts:logout' %}"><i class="bi bi-box-arrow-left me-2"></i>Sign out</a></li>
+          </ul>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>
+
+<!-- AJAX Modal -->
+<div class="modal fade" id="ajaxModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content" id="ajaxModalContent"><div class="modal-body text-center py-5"><div class="spinner-border"></div></div></div></div></div>
+
+<!-- Offcanvas quick actions -->
+<div class="offcanvas offcanvas-end" id="quickActionsPanel">
+  <div class="offcanvas-header"><h5 class="offcanvas-title font-display">Quick Actions</h5><button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button></div>
+  <div class="offcanvas-body">
+    {% if 'manage_employees' in perms_set %}<a href="{% url 'employees:create' %}?modal=1" class="quick-action-btn" data-modal-url="{% url 'employees:create' %}?modal=1" data-modal-title="Add Employee"><i class="bi bi-person-plus"></i> Add Employee</a>{% endif %}
+    <a href="{% url 'leave:my_requests' %}" class="quick-action-btn"><i class="bi bi-calendar-plus"></i> Request Leave</a>
+    <a href="{% url 'attendance:my_attendance' %}" class="quick-action-btn"><i class="bi bi-fingerprint"></i> My Attendance</a>
+    <a href="{% url 'payroll:my_payslips' %}" class="quick-action-btn"><i class="bi bi-receipt"></i> My Payslips</a>
+  </div>
+</div>
+
+<button class="fab-btn" data-bs-toggle="offcanvas" data-bs-target="#quickActionsPanel" title="Quick actions"><i class="bi bi-lightning-fill"></i></button>
+
+{% if request.user.is_authenticated %}
+<div id="idleSessionBanner" class="idle-session-banner d-none" role="alert">
+  <div class="idle-session-banner-inner">
+    <i class="bi bi-hourglass-split me-2"></i>
+    <span>Session expiring soon due to inactivity. Move your mouse or press a key to stay signed in.</span>
+    <strong class="ms-2" id="idleSessionCountdown"></strong>
+  </div>
+</div>
+<script>
+  window.HRMS_IDLE = {
+    timeoutSeconds: {{ IDLE_SESSION_TIMEOUT_SECONDS|default:120 }},
+    warnSeconds: 20,
+    logoutUrl: "{% url 'accounts:logout' %}?reason=idle"
+  };
+</script>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.45.2/dist/apexcharts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="{% static 'js/hrms.js' %}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Recruitment{% endblock %}
+{% block page_title %}Recruitment{% endblock %}
+{% block page_subtitle %}Hiring pipeline overview{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap gap-2 justify-content-between mb-4">
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{% url 'recruitment:pipeline' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-kanban me-1"></i>Pipeline</a>
+    <a href="{% url 'recruitment:vacancies' %}" class="btn btn-outline-secondary btn-sm">Vacancies</a>
+    <a href="{% url 'recruitment:applications' %}" class="btn btn-outline-secondary btn-sm">Applications</a>
+    <a href="{% url 'recruitment:interviews' %}" class="btn btn-outline-secondary btn-sm">Interviews</a>
+    <a href="{% url 'recruitment:offers' %}" class="btn btn-outline-secondary btn-sm">Offers</a>
+    <a href="{% url 'recruitment:requisitions' %}" class="btn btn-outline-secondary btn-sm">Requisitions</a>
+    <a href="{% url 'recruitment:careers' %}" class="btn btn-outline-secondary btn-sm" target="_blank">Careers portal</a>
+  </div>
+  {% if can_manage %}
+  <div class="d-flex gap-2">
+    <a href="{% url 'recruitment:requisition_create' %}" class="btn btn-light btn-sm">New requisition</a>
+    <a href="{% url 'recruitment:vacancy_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Post vacancy</a>
+  </div>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4 col-xl-2">{% include "partials/_stat_card.html" with eyebrow="Open roles" value=open_vacancies icon="bi-briefcase-fill" accent="amber" %}</div>
+  <div class="col-6 col-md-4 col-xl-2">{% include "partials/_stat_card.html" with eyebrow="Active candidates" value=active_apps icon="bi-people-fill" accent="teal" %}</div>
+  <div class="col-6 col-md-4 col-xl-2">{% include "partials/_stat_card.html" with eyebrow="Interviews" value=upcoming_interviews icon="bi-calendar-event-fill" accent="violet" %}</div>
+  <div class="col-6 col-md-4 col-xl-2">{% include "partials/_stat_card.html" with eyebrow="Pending reqs" value=pending_reqs icon="bi-file-earmark-check" accent="rose" %}</div>
+  <div class="col-6 col-md-4 col-xl-2">{% include "partials/_stat_card.html" with eyebrow="Offers out" value=offers_out icon="bi-envelope-paper" accent="teal" %}</div>
+  <div class="col-6 col-md-4 col-xl-2">{% include "partials/_stat_card.html" with eyebrow="Hired (month)" value=hired_month icon="bi-person-check-fill" accent="amber" %}</div>
+</div>
+
+<div class="surface-card mb-4">
+  <div class="surface-card-header"><h3 class="surface-card-title">Pipeline</h3></div>
+  <div class="surface-card-body">
+    <div class="row g-2 text-center">
+      {% for key, label, n in pipeline_stages %}
+      <div class="col">
+        <a href="{% url 'recruitment:applications' %}?status={{ key }}" class="text-decoration-none text-dark d-block p-2 rounded" style="background:rgba(15,39,68,.04);">
+          <div class="fs-4 fw-semibold">{{ n }}</div>
+          <div class="small text-secondary">{{ label }}</div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="surface-card h-100">
+      <div class="surface-card-header d-flex justify-content-between">
+        <h3 class="surface-card-title mb-0">Recent applications</h3>
+        <a href="{% url 'recruitment:applications' %}" class="small">View all</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Candidate</th><th>Role</th><th>Status</th></tr></thead>
+          <tbody>
+          {% for a in recent_applications %}
+          <tr>
+            <td><a href="{% url 'recruitment:application_detail' a.pk %}">{{ a.full_name }}</a></td>
+            <td>{{ a.vacancy.title }}</td>
+            <td><span class="status-pill status-{{ a.status }}">{{ a.get_status_display }}</span></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3"><div class="empty-state py-4"><i class="bi bi-inbox"></i>No applications yet.</div></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="surface-card h-100">
+      <div class="surface-card-header d-flex justify-content-between">
+        <h3 class="surface-card-title mb-0">Upcoming interviews</h3>
+        <a href="{% url 'recruitment:interviews' %}" class="small">View all</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Candidate</th><th>When</th><th>Type</th></tr></thead>
+          <tbody>
+          {% for i in upcoming_interview_list %}
+          <tr>
+            <td><a href="{% url 'recruitment:interview_detail' i.pk %}">{{ i.application.full_name }}</a></td>
+            <td>{{ i.scheduled_at|date:"M d, H:i" }}</td>
+            <td>{{ i.get_interview_type_display }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3"><div class="empty-state py-4"><i class="bi bi-calendar"></i>No upcoming interviews.</div></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if pending_requisitions %}
+<div class="surface-card mt-3">
+  <div class="surface-card-header"><h3 class="surface-card-title">Requisitions awaiting approval</h3></div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Title</th><th>Dept</th><th>Status</th><th>Requested by</th></tr></thead>
+      <tbody>
+      {% for r in pending_requisitions %}
+      <tr>
+        <td><a href="{% url 'recruitment:requisition_detail' r.pk %}">{{ r.title }}</a></td>
+        <td>{{ r.department.name|default:"—" }}</td>
+        <td><span class="status-pill status-{{ r.status }}">{{ r.get_status_display }}</span></td>
+        <td>{{ r.requested_by.get_full_name|default:r.requested_by }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

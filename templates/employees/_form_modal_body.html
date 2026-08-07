@@ -1,0 +1,154 @@
+<form method="post" action="{% if mode == 'edit' %}{% url 'employees:edit' employee.pk %}{% else %}{% url 'employees:create' %}{% endif %}" enctype="multipart/form-data">
+  {% csrf_token %}
+
+  <h6 class="fw-semibold mb-2" style="font-size:0.82rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary);">Account &amp; identity</h6>
+  <div class="row g-3 mb-3">
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">First name</label>
+      {{ user_form.first_name }}
+      {% for e in user_form.first_name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Last name</label>
+      {{ user_form.last_name }}
+    </div>
+    {% if mode == 'create' %}
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Username</label>
+      {{ user_form.username }}
+      {% for e in user_form.username.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+    {% endif %}
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Email</label>
+      {{ user_form.email }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Phone</label>
+      {{ user_form.phone_number }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Role</label>
+      {{ user_form.role }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Profile photo</label>
+      {{ user_form.avatar }}
+      {% if mode == 'edit' and employee.user.avatar %}
+      <div class="mt-2"><img src="{{ employee.user.avatar.url }}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:50%;"></div>
+      {% endif %}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Passport / staff photo</label>
+      {{ employee_form.passport_photo }}
+      {% if mode == 'edit' and employee.passport_photo %}
+      <div class="mt-2"><img src="{{ employee.passport_photo.url }}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px;"></div>
+      {% endif %}
+    </div>
+    {% if mode == 'create' %}
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Temporary password</label>
+      {{ user_form.password1 }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Confirm password</label>
+      {{ user_form.password2 }}
+    </div>
+    {% else %}
+    <div class="col-md-6 d-flex align-items-center gap-2 pt-4">
+      {{ user_form.is_active }} <label class="form-check-label small">Account active (can log in)</label>
+    </div>
+    <div class="col-md-6 d-flex align-items-center gap-2 pt-4">
+      {{ user_form.is_active_employee }} <label class="form-check-label small">Currently employed</label>
+    </div>
+    {% endif %}
+  </div>
+
+  <h6 class="fw-semibold mb-2 mt-4" style="font-size:0.82rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary);">Employment details</h6>
+  <div class="row g-3 mb-3">
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Department</label>
+      {{ employee_form.department }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Designation</label>
+      {{ employee_form.designation }}
+    </div>
+    <div class="col-md-12">
+      <label class="form-label small fw-semibold">Branch assignment <span class="text-danger">*</span></label>
+      {{ employee_form.branches }}
+      <div class="form-text">{{ employee_form.branches.help_text }}</div>
+      {% for e in employee_form.branches.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Manager</label>
+      {{ employee_form.manager }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Employment type</label>
+      {{ employee_form.employment_type }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Date joined</label>
+      {{ employee_form.date_joined }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Status</label>
+      {{ employee_form.status }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Gender</label>
+      {{ employee_form.gender }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Date of birth</label>
+      {{ employee_form.date_of_birth }}
+    </div>
+  </div>
+
+  <h6 class="fw-semibold mb-2 mt-4" style="font-size:0.82rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary);">Payroll &amp; biometrics</h6>
+  <div class="row g-3 mb-3">
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Basic salary</label>
+      {{ employee_form.basic_salary }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">ZKTeco User ID</label>
+      {{ employee_form.biometric_id }}
+      <div class="text-secondary" style="font-size:0.72rem;">Must match the User ID enrolled on the fingerprint/face terminal (not the HRMS employee code).</div>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Bank name</label>
+      {{ employee_form.bank_name }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Bank account number</label>
+      {{ employee_form.bank_account_number }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Tax ID</label>
+      {{ employee_form.tax_id }}
+    </div>
+  </div>
+
+  <h6 class="fw-semibold mb-2 mt-4" style="font-size:0.82rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary);">Emergency contact</h6>
+  <div class="row g-3 mb-3">
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Contact name</label>
+      {{ employee_form.emergency_contact_name }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Contact phone</label>
+      {{ employee_form.emergency_contact_phone }}
+    </div>
+    <div class="col-md-12">
+      <label class="form-label small fw-semibold">Address</label>
+      {{ employee_form.address }}
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+    <button type="submit" class="btn btn-amber">{% if mode == 'edit' %}Save changes{% else %}Create employee{% endif %}</button>
+  </div>
+</form>

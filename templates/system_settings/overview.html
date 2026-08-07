@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block page_title %}System Settings{% endblock %}
+{% block page_subtitle %}Company configuration & holiday calendar{% endblock %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-xl-7"><div class="surface-card"><div class="surface-card-header"><h3 class="surface-card-title">Settings</h3></div>
+  <div class="table-responsive"><table class="table table-hrms mb-0"><thead><tr><th>Key</th><th>Value</th><th>Category</th></tr></thead><tbody>
+  {% for s in settings %}<tr><td class="fw-semibold">{{ s.key }}</td><td>{{ s.value|truncatechars:50 }}</td><td><span class="chip">{{ s.get_category_display }}</span></td></tr>{% empty %}<tr><td colspan="3"><div class="empty-state"><i class="bi bi-gear"></i>No settings configured.</div></td></tr>{% endfor %}
+  </tbody></table></div></div></div>
+  <div class="col-xl-5"><div class="surface-card"><div class="surface-card-header"><h3 class="surface-card-title">Holiday Calendar</h3></div>
+  <div class="table-responsive"><table class="table table-hrms mb-0"><thead><tr><th>Holiday</th><th>Date</th></tr></thead><tbody>
+  {% for h in holidays %}<tr><td>{{ h.name }}</td><td>{{ h.date|date:"M d, Y" }}</td></tr>{% empty %}<tr><td colspan="2"><div class="empty-state"><i class="bi bi-calendar"></i>No holidays set.</div></td></tr>{% endfor %}
+  </tbody></table></div></div></div>
+</div>
+{% endblock %}

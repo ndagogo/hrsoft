@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Roles &amp; Permissions{% endblock %}
+{% block page_title %}Roles &amp; Permissions{% endblock %}
+{% block page_subtitle %}Define who can do what across the system{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+  <div>
+    <h2 class="section-heading">Roles</h2>
+    <p class="section-subtext mb-0">Each role bundles permissions and determines which dashboard its members land on.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'rbac:permissions' %}" class="btn btn-light"><i class="bi bi-key me-1"></i>Manage Permissions</a>
+    <a href="{% url 'rbac:audit_log' %}" class="btn btn-light"><i class="bi bi-list-check me-1"></i>Audit Log</a>
+    <button class="btn btn-amber" data-bs-toggle="modal" data-bs-target="#newRoleModal"><i class="bi bi-shield-plus me-1"></i>New Role</button>
+  </div>
+</div>
+
+<div class="row g-3">
+  {% for role in roles %}
+  <div class="col-md-6 col-xl-4">
+    <div class="surface-card surface-card-body h-100">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div class="d-flex align-items-center gap-2">
+          <span style="width:10px; height:10px; border-radius:50%; background:{{ role.color }}; display:inline-block;"></span>
+          <h5 class="font-display fw-semibold mb-0">{{ role.name }}</h5>
+        </div>
+        {% if role.is_system_role %}<span class="chip"><i class="bi bi-lock-fill"></i> System</span>{% endif %}
+      </div>
+      <p class="text-secondary mb-3" style="font-size:0.82rem; min-height:2.2em;">{{ role.description|default:"No description." }}</p>
+
+      <div class="d-flex justify-content-between py-1" style="font-size:0.85rem;">
+        <span class="text-secondary">Permissions</span><span class="fw-semibold">{{ role.permissions.count }}</span>
+      </div>
+      <div class="d-flex justify-content-between py-1" style="font-size:0.85rem;">
+        <span class="text-secondary">Members</span><span class="fw-semibold">{{ role.member_count }}</span>
+      </div>
+      <div class="d-flex justify-content-between py-1" style="font-size:0.85rem;">
+        <span class="text-secondary">Dashboard</span><span class="fw-semibold text-capitalize">{{ role.dashboard_key }}</span>
+      </div>
+
+      <div class="d-flex gap-2 mt-3 pt-3 border-top">
+        <a href="{% url 'rbac:role_builder' role.pk %}" class="btn btn-sm btn-ink flex-grow-1"><i class="bi bi-sliders me-1"></i>Edit permissions</a>
+        {% if not role.is_system_role %}
+        <form method="post" action="{% url 'rbac:role_delete' role.pk %}" onsubmit="return confirm('Delete role {{ role.name }}?');">
+          {% csrf_token %}<button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="col-12"><div class="empty-state"><i class="bi bi-shield-lock"></i>No roles defined yet.</div></div>
+  {% endfor %}
+</div>
+
+<div class="modal fade" id="newRoleModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'rbac:role_create' %}">
+        {% csrf_token %}
+        <div class="modal-header"><h5 class="modal-title font-display">New role</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-3"><label class="form-label small fw-semibold">Name</label>{{ form.name }}</div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Description</label>{{ form.description }}</div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Dashboard</label>{{ form.dashboard_key }}</div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Badge color</label>{{ form.color }}</div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-amber">Create &amp; assign permissions →</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

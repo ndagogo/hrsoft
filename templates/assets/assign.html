@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Assign {{ asset.asset_number }}{% endblock %}
+{% block page_title %}Assign Asset{% endblock %}
+{% block page_subtitle %}{{ asset.name }}{% endblock %}
+{% block content %}
+<div class="mb-4"><a href="{% url 'assets:detail' asset.pk %}" class="btn btn-light btn-sm">Back</a></div>
+<div class="surface-card surface-card-body" style="max-width:560px;">
+  <form method="post">{% csrf_token %}
+    {% for field in form %}
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">{{ field.label }}</label>
+      {{ field }}
+    </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary">Issue to Employee</button>
+  </form>
+</div>
+{% endblock %}

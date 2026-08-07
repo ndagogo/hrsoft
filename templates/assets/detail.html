@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}{{ asset.asset_number }}{% endblock %}
+{% block page_title %}{{ asset.name }}{% endblock %}
+{% block page_subtitle %}{{ asset.asset_number }} · {{ asset.category.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+  <a href="{% url 'assets:list' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Inventory</a>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{% url 'assets:qr' asset.pk %}" class="btn btn-light btn-sm"><i class="bi bi-qr-code me-1"></i>QR Code</a>
+    {% if can_manage %}
+      {% if asset.status == 'pending_approval' %}
+      <form method="post" action="{% url 'assets:approve' asset.pk %}">{% csrf_token %}<button class="btn btn-success btn-sm">Approve</button></form>
+      {% endif %}
+      {% if asset.status == 'available' or asset.status == 'reserved' %}
+      <a href="{% url 'assets:assign' asset.pk %}" class="btn btn-primary btn-sm">Assign</a>
+      {% endif %}
+      <a href="{% url 'assets:edit' asset.pk %}" class="btn btn-light btn-sm">Edit</a>
+      <a href="{% url 'assets:maintenance' asset.pk %}" class="btn btn-light btn-sm">Maintenance</a>
+      {% if asset.status != 'disposed' %}
+      <a href="{% url 'assets:dispose' asset.pk %}" class="btn btn-outline-danger btn-sm">Dispose</a>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="surface-card surface-card-body">
+      <span class="status-pill status-{{ asset.status }} mb-3 d-inline-block">{{ asset.get_status_display }}</span>
+      <div class="small">
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Brand / Model</span><span>{{ asset.brand }} {{ asset.model }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Serial</span><span class="font-monospace">{{ asset.serial_number|default:"—" }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Barcode</span><span>{{ asset.barcode|default:"—" }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Branch</span><span>{{ asset.branch.name|default:"—" }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Location</span><span>{{ asset.location|default:"—" }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Condition</span><span>{{ asset.get_condition_display }}</span></div>
+      </div>
+      <hr>
+      <h6 class="fw-semibold small text-uppercase text-secondary">Warranty & Insurance</h6>
+      <div class="small">
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Warranty</span><span>{% if asset.warranty_end %}{{ asset.warranty_start|date:"Y" }} – {{ asset.warranty_end|date:"Y" }}{% else %}—{% endif %}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">AMC</span><span>{{ asset.amc_provider|default:"—" }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Insurance</span><span>{{ asset.insurance_provider|default:"—" }}</span></div>
+      </div>
+      <hr>
+      <h6 class="fw-semibold small text-uppercase text-secondary">Purchase</h6>
+      <div class="small">
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Vendor</span><span>{{ asset.vendor|default:"—" }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Price</span><span>₦{{ asset.purchase_price }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Invoice</span><span>{{ asset.invoice_number|default:"—" }}</span></div>
+      </div>
+    </div>
+
+    {% with a=asset.current_assignment %}
+    {% if a %}
+    <div class="surface-card surface-card-body mt-3">
+      <h6 class="fw-semibold mb-2">Currently Assigned</h6>
+      <div class="fw-semibold">{{ a.employee.full_name }}</div>
+      <div class="text-secondary small">{{ a.employee.department.name|default:"—" }} · Issued {{ a.assigned_date|date:"M d, Y" }}</div>
+      {% if a.accessories_issued %}<div class="small mt-2"><span class="text-secondary">Accessories:</span> {{ a.accessories_issued }}</div>{% endif %}
+      {% if can_manage %}
+      <div class="d-flex gap-2 mt-3">
+        <a href="{% url 'assets:return' a.pk %}" class="btn btn-sm btn-primary">Process Return</a>
+        <a href="{% url 'assets:transfer' a.pk %}" class="btn btn-sm btn-light">Transfer</a>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% endwith %}
+  </div>
+
+  <div class="col-lg-8">
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title">Assignment History</h3></div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Employee</th><th>Issued</th><th>Returned</th><th>Condition</th><th>Status</th></tr></thead>
+          <tbody>
+          {% for asn in assignments %}
+            <tr>
+              <td>{{ asn.employee.full_name }}</td>
+              <td>{{ asn.assigned_date|date:"M d, Y" }}</td>
+              <td>{{ asn.returned_date|date:"M d, Y"|default:"—" }}</td>
+              <td>{{ asn.get_condition_on_assign_display }}</td>
+              <td>{% if asn.is_active %}<span class="chip">Active</span>{% else %}Closed{% endif %}</td>
+            </tr>
+          {% empty %}<tr><td colspan="5" class="text-secondary small">No assignments yet.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title">Audit Trail</h3></div>
+      <div class="surface-card-body">
+        <div class="timeline-simple">
+        {% for h in history %}
+          <div class="mb-3 ps-3 border-start border-2" style="border-color:var(--ink-200)!important;">
+            <div class="fw-semibold small">{{ h.get_event_type_display }}</div>
+            <div>{{ h.summary }}</div>
+            <div class="text-secondary" style="font-size:0.74rem;">{{ h.created_at|date:"M d, Y H:i" }}{% if h.actor %} · {{ h.actor.get_full_name|default:h.actor.username }}{% endif %}</div>
+          </div>
+        {% empty %}
+          <div class="text-secondary small">No events logged.</div>
+        {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

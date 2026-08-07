@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}{{ vacancy.title }}{% endblock %}
+{% block page_title %}{{ vacancy.title }}{% endblock %}
+{% block page_subtitle %}{{ vacancy.get_status_display }} · {{ vacancy.department.name|default:"" }}{% endblock %}
+{% block content %}
+<div class="mb-4 d-flex flex-wrap gap-2">
+  <a href="{% url 'recruitment:vacancies' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+  {% if can_manage %}
+  <a href="{% url 'recruitment:vacancy_edit' vacancy.pk %}" class="btn btn-outline-secondary btn-sm">Edit</a>
+  {% if vacancy.status == 'draft' or vacancy.status == 'on_hold' %}
+  <form method="post" action="{% url 'recruitment:vacancy_publish' vacancy.pk %}">{% csrf_token %}<button class="btn btn-primary btn-sm">Publish</button></form>
+  {% endif %}
+  {% if vacancy.status == 'open' %}
+  <form method="post" action="{% url 'recruitment:vacancy_close' vacancy.pk %}">{% csrf_token %}<button class="btn btn-outline-danger btn-sm">Close</button></form>
+  {% endif %}
+  <a href="{% url 'recruitment:application_create' %}?vacancy={{ vacancy.pk }}" class="btn btn-success btn-sm">Add applicant</a>
+  {% if vacancy.is_public and vacancy.slug %}
+  <a href="{% url 'recruitment:careers_detail' vacancy.slug %}" class="btn btn-outline-secondary btn-sm" target="_blank">Public link</a>
+  {% endif %}
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-8">
+    <div class="surface-card surface-card-body">
+      <div class="row g-2 small mb-3">
+        <div class="col-md-3"><span class="text-secondary">Type</span><div class="fw-semibold">{{ vacancy.get_employment_type_display }}</div></div>
+        <div class="col-md-3"><span class="text-secondary">Mode</span><div class="fw-semibold">{{ vacancy.get_work_mode_display }}</div></div>
+        <div class="col-md-3"><span class="text-secondary">Positions</span><div class="fw-semibold">{{ vacancy.positions }}</div></div>
+        <div class="col-md-3"><span class="text-secondary">Closes</span><div class="fw-semibold">{{ vacancy.closing_date|date:"M d, Y"|default:"—" }}</div></div>
+      </div>
+      <h3 class="h6">Description</h3>
+      <p style="white-space:pre-wrap;">{{ vacancy.description }}</p>
+      {% if vacancy.responsibilities %}<h3 class="h6">Responsibilities</h3><p style="white-space:pre-wrap;">{{ vacancy.responsibilities }}</p>{% endif %}
+      {% if vacancy.requirements %}<h3 class="h6">Requirements</h3><p style="white-space:pre-wrap;">{{ vacancy.requirements }}</p>{% endif %}
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="surface-card surface-card-body small">
+      <div class="mb-2"><span class="text-secondary">Recruiter</span><div>{{ vacancy.recruiter|default:"—" }}</div></div>
+      <div class="mb-2"><span class="text-secondary">Hiring manager</span><div>{{ vacancy.hiring_manager|default:"—" }}</div></div>
+      <div class="mb-2"><span class="text-secondary">Visibility</span><div>{% if vacancy.is_public %}Public careers{% endif %}{% if vacancy.is_internal %}{% if vacancy.is_public %} · {% endif %}Internal{% endif %}</div></div>
+      {% if vacancy.requisition %}<div><span class="text-secondary">Requisition</span><div><a href="{% url 'recruitment:requisition_detail' vacancy.requisition_id %}">REQ-{{ vacancy.requisition_id }}</a></div></div>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="surface-card">
+  <div class="surface-card-header d-flex justify-content-between">
+    <h3 class="surface-card-title mb-0">Applicants ({{ applications|length }})</h3>
+    <a href="{% url 'recruitment:pipeline' %}?vacancy={{ vacancy.pk }}" class="small">Pipeline view</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Name</th><th>Email</th><th>Source</th><th>Status</th><th>Applied</th></tr></thead>
+      <tbody>
+      {% for a in applications %}
+      <tr>
+        <td><a href="{% url 'recruitment:application_detail' a.pk %}">{{ a.full_name }}</a></td>
+        <td>{{ a.email }}</td>
+        <td>{{ a.get_source_display }}</td>
+        <td><span class="status-pill status-{{ a.status }}">{{ a.get_status_display }}</span></td>
+        <td>{{ a.applied_at|date:"M d, Y" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5"><div class="empty-state"><i class="bi bi-people"></i>No applications yet.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

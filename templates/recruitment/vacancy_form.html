@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == 'create' %}New vacancy{% else %}Edit vacancy{% endif %}{% endblock %}
+{% block page_title %}{% if mode == 'create' %}Post vacancy{% else %}Edit {{ vacancy.title }}{% endif %}{% endblock %}
+{% block page_subtitle %}Job posting details{% endblock %}
+{% block content %}
+<div class="mb-4"><a href="{% url 'recruitment:vacancies' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a></div>
+<div class="surface-card surface-card-body" style="max-width:960px;">
+  <form method="post">{% csrf_token %}
+    <div class="row g-3">
+      {% for field in form %}
+      <div class="{% if field.name in 'description,requirements,responsibilities' %}col-12{% else %}col-md-6{% endif %}">
+        <label class="form-label small fw-semibold">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+        {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="mt-4 d-flex gap-2">
+      <button type="submit" class="btn btn-light">Save</button>
+      {% if mode == 'create' %}
+      <button type="submit" name="publish" value="1" class="btn btn-primary">Save &amp; publish</button>
+      {% endif %}
+    </div>
+  </form>
+</div>
+{% endblock %}

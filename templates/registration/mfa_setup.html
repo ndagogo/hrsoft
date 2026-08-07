@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Setup MFA{% endblock %}
+{% block page_title %}Two-Factor Authentication{% endblock %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-md-6"><div class="surface-card"><div class="surface-card-body text-center">
+    <h3 class="h6 fw-semibold">Scan QR code</h3>
+    <img src="data:image/png;base64,{{ qr_base64 }}" alt="MFA QR Code" class="img-fluid my-3" style="max-width:200px;">
+    <p class="small text-secondary">Or enter manually: <code>{{ secret }}</code></p>
+  </div></div></div>
+  <div class="col-md-6"><div class="surface-card"><div class="surface-card-body">
+    {% if is_active %}<div class="alert alert-success">MFA is <strong>enabled</strong> on your account.</div>
+    <form method="post" action="{% url 'accounts:mfa_disable' %}">{% csrf_token %}<button class="btn btn-light text-danger">Disable MFA</button></form>
+    {% else %}
+    <p class="section-subtext">Scan the QR code with Google Authenticator, Authy, or similar, then enter a code to confirm.</p>
+    <form method="post">{% csrf_token %}
+      <input type="text" name="token" class="form-control mb-3" maxlength="6" placeholder="6-digit code" required>
+      <button type="submit" class="btn btn-amber">Enable MFA</button>
+    </form>
+    {% endif %}
+  </div></div></div>
+</div>
+{% endblock %}

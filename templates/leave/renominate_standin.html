@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Select Stand-in{% endblock %}
+{% block page_title %}Select another stand-in{% endblock %}
+{% block page_subtitle %}{{ leave_request.leave_type.name }} · {{ leave_request.start_date|date:"M d" }} – {{ leave_request.end_date|date:"M d, Y" }}{% endblock %}
+
+{% block content %}
+<div class="surface-card surface-card-body" style="max-width:520px;">
+  <p class="text-secondary small">Your previous stand-in declined. Choose another colleague from your department.</p>
+  <form method="post">{% csrf_token %}
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Stand-in colleague</label>
+      {{ form.stand_in_employee }}
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'leave:detail' leave_request.pk %}" class="btn btn-light">Cancel</a>
+      <button type="submit" class="btn btn-amber">Send stand-in request</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

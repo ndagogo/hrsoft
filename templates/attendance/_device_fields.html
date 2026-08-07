@@ -1,0 +1,86 @@
+{% comment %}
+Shared fields for BiometricDeviceForm.
+{% endcomment %}
+<div class="row g-3">
+  <div class="col-md-6">
+    <label class="form-label small fw-semibold">Device name</label>
+    {{ form.name }}
+  </div>
+  <div class="col-md-6">
+    <label class="form-label small fw-semibold">Brand</label>
+    {{ form.brand }}
+  </div>
+  <div class="col-md-6">
+    <label class="form-label small fw-semibold">Connection mode</label>
+    {{ form.connection_mode }}
+  </div>
+  <div class="col-md-6">
+    <label class="form-label small fw-semibold">Location</label>
+    {{ form.location }}
+  </div>
+  <div class="col-md-8">
+    <label class="form-label small fw-semibold">IP address</label>
+    {{ form.ip_address }}
+    <div class="form-text">Use the static IP from the device Ethernet screen (DHCP Off).</div>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label small fw-semibold">TCP COMM. Port</label>
+    {{ form.port }}
+    <div class="form-text">ZKTeco default: <strong>4370</strong></div>
+  </div>
+  <div class="col-md-6 device-field-zk">
+    <label class="form-label small fw-semibold">Comm key</label>
+    {{ form.comm_key }}
+    <div class="form-text">ZKTeco device communication password (usually 0).</div>
+  </div>
+  <div class="col-md-6 device-field-hik">
+    <label class="form-label small fw-semibold">ISAPI username</label>
+    {{ form.username }}
+  </div>
+  <div class="col-md-6 device-field-hik">
+    <label class="form-label small fw-semibold">ISAPI password</label>
+    {{ form.password }}
+  </div>
+  <div class="col-md-6">
+    <label class="form-label small fw-semibold">Serial number</label>
+    {{ form.serial_number }}
+  </div>
+  <div class="col-md-6">
+    <label class="form-label small fw-semibold">Webhook token</label>
+    {{ form.webhook_token }}
+  </div>
+  <div class="col-md-12 d-flex align-items-center gap-2 pt-2">
+    {{ form.is_active }} <label class="form-check-label small">Device is active</label>
+  </div>
+</div>
+<div class="alert alert-info mt-3 mb-0" style="font-size:0.78rem;">
+  <i class="bi bi-info-circle me-1"></i>
+  <strong>Quick setup:</strong>
+  1) Brand = ZKTeco · IP = <code>192.168.1.201</code> · Port = <code>4370</code> · DHCP Off on the terminal.
+  2) Use <strong>Test</strong> then <strong>Sync now</strong> to pull punches.
+  3) Link each device User ID to an employee below (or set <em>ZKTeco User ID</em> on the employee profile).
+</div>
+<script>
+(function(){
+  function toggleBrandFields(root){
+    const brand = root.querySelector('[name="brand"]');
+    if(!brand) return;
+    const isZk = brand.value === 'zkteco';
+    root.querySelectorAll('.device-field-zk').forEach(el => el.style.display = isZk ? '' : 'none');
+    root.querySelectorAll('.device-field-hik').forEach(el => el.style.display = isZk ? 'none' : '');
+    const port = root.querySelector('[name="port"]');
+    if(port && !port.dataset.touched){
+      if(isZk && (!port.value || port.value === '80')) port.value = '4370';
+      if(!isZk && (!port.value || port.value === '4370')) port.value = '80';
+    }
+  }
+  document.querySelectorAll('form').forEach(function(form){
+    const brand = form.querySelector('[name="brand"]');
+    if(!brand) return;
+    const port = form.querySelector('[name="port"]');
+    if(port) port.addEventListener('input', () => port.dataset.touched = '1');
+    brand.addEventListener('change', () => toggleBrandFields(form));
+    toggleBrandFields(form);
+  });
+})();
+</script>

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}My Assets{% endblock %}
+{% block page_title %}My Assigned Assets{% endblock %}
+{% block page_subtitle %}{{ employee.full_name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-4">
+  <a href="{% url 'assets:request_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Request Asset</a>
+</div>
+<div class="surface-card">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Asset</th><th>Tag</th><th>Issued</th><th>Expected Return</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for a in assignments %}
+        <tr>
+          <td class="fw-semibold">{{ a.asset.name }}</td>
+          <td class="font-monospace">{{ a.asset.asset_number }}</td>
+          <td>{{ a.assigned_date|date:"M d, Y" }}</td>
+          <td>{% if a.expected_return_date %}{{ a.expected_return_date|date:"M d, Y" }}{% else %}Permanent{% endif %}</td>
+          <td><span class="status-pill status-assigned">Assigned</span></td>
+          <td><a href="{% url 'assets:qr' a.asset_id %}" class="btn btn-light btn-sm">QR</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6"><div class="empty-state"><i class="bi bi-laptop"></i>No assets assigned to you.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

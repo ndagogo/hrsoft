@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}My Profile{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+{% block page_subtitle %}Manage your personal account details and photo{% endblock %}
+
+{% block content %}
+<div class="surface-card mx-auto" style="max-width:600px;">
+  <div class="surface-card-body">
+    <div class="text-center mb-4">
+      {% if request.user.avatar %}
+      <img src="{{ request.user.avatar.url }}" alt="Profile photo" class="mx-auto" style="width:88px;height:88px;object-fit:cover;border-radius:50%;">
+      {% else %}
+      <div class="avatar-circle mx-auto" style="width:72px; height:72px; font-size:1.6rem; background:var(--ink-100); color:var(--ink-900);">{{ request.user.initials }}</div>
+      {% endif %}
+      <h5 class="font-display fw-semibold mt-3 mb-0">{{ request.user.get_full_name }}</h5>
+      <span class="role-badge mt-2 d-inline-block">{{ current_role|default:"Unassigned" }}</span>
+    </div>
+
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold">First name</label>
+          {{ form.first_name }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold">Last name</label>
+          {{ form.last_name }}
+        </div>
+        <div class="col-md-12">
+          <label class="form-label small fw-semibold">Email</label>
+          {{ form.email }}
+        </div>
+        <div class="col-md-12">
+          <label class="form-label small fw-semibold">Phone number</label>
+          {{ form.phone_number }}
+        </div>
+        <div class="col-md-12">
+          <label class="form-label small fw-semibold">Personal photo</label>
+          {{ form.avatar }}
+          <div class="form-text">Upload a clear passport-style photo (JPG or PNG).</div>
+        </div>
+      </div>
+      <div class="d-flex justify-content-between mt-4 pt-3 border-top flex-wrap gap-2">
+        <div class="d-flex gap-2 flex-wrap">
+          <a href="{% url 'documents:my' %}" class="btn btn-light"><i class="bi bi-folder me-1"></i>My documents</a>
+          <a href="{% url 'accounts:change_password' %}" class="btn btn-light"><i class="bi bi-key me-1"></i>Change password</a>
+          <a href="{% url 'accounts:mfa_setup' %}" class="btn btn-light"><i class="bi bi-shield-lock me-1"></i>{% if request.user.mfa_enabled %}MFA enabled{% else %}Setup MFA{% endif %}</a>
+        </div>
+        <button type="submit" class="btn btn-amber">Save changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

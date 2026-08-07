@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Asset Dashboard{% endblock %}
+{% block page_title %}Asset Management{% endblock %}
+{% block page_subtitle %}Inventory, assignments & lifecycle tracking{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{% url 'assets:list' %}" class="btn btn-light btn-sm"><i class="bi bi-list-ul me-1"></i>Inventory</a>
+    <a href="{% url 'assets:requests' %}" class="btn btn-light btn-sm"><i class="bi bi-inbox me-1"></i>Requests</a>
+    <a href="{% url 'assets:reports' %}" class="btn btn-light btn-sm"><i class="bi bi-file-earmark-bar-graph me-1"></i>Reports</a>
+  </div>
+  {% if can_manage %}
+  <a href="{% url 'assets:create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Register Asset</a>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Total Assets" value=metrics.total icon="bi-laptop" accent="ink" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Available" value=metrics.available icon="bi-check-circle" accent="teal" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Assigned" value=metrics.assigned icon="bi-person-check" accent="violet" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Maintenance" value=metrics.maintenance icon="bi-tools" accent="amber" %}</div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-sm-4">{% include "partials/_stat_card.html" with eyebrow="Lost" value=metrics.lost icon="bi-question-circle" accent="ink" %}</div>
+  <div class="col-sm-4">{% include "partials/_stat_card.html" with eyebrow="Damaged" value=metrics.damaged icon="bi-exclamation-triangle" accent="amber" %}</div>
+  <div class="col-sm-4">{% include "partials/_stat_card.html" with eyebrow="Retired" value=metrics.retired icon="bi-archive" accent="ink" %}</div>
+</div>
+
+<div class="row g-3">
+  <div class="col-xl-5">
+    <div class="surface-card h-100">
+      <div class="surface-card-header"><h3 class="surface-card-title">Assets by Category</h3></div>
+      <div class="surface-card-body">
+        {% for row in by_category %}
+        <div class="d-flex justify-content-between py-2 border-bottom" style="font-size:0.85rem;">
+          <span>{{ row.category__name }}</span>
+          <span class="fw-semibold">{{ row.count }}</span>
+        </div>
+        {% empty %}<div class="text-secondary small">No data yet.</div>{% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="surface-card h-100">
+      <div class="surface-card-header"><h3 class="surface-card-title">By Branch</h3></div>
+      <div class="surface-card-body">
+        {% for row in by_branch %}
+        <div class="d-flex justify-content-between py-2 border-bottom" style="font-size:0.85rem;">
+          <span>{{ row.branch__name|default:"Unassigned" }}</span>
+          <span class="fw-semibold">{{ row.count }}</span>
+        </div>
+        {% empty %}<div class="text-secondary small">No branch data.</div>{% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-3">
+    <div class="surface-card h-100">
+      <div class="surface-card-header"><h3 class="surface-card-title">Pending Approval</h3></div>
+      <div class="surface-card-body">
+        {% for a in pending %}
+        <a href="{% url 'assets:detail' a.pk %}" class="d-block mb-2 text-decoration-none">
+          <div class="fw-semibold small">{{ a.asset_number }}</div>
+          <div class="text-secondary" style="font-size:0.74rem;">{{ a.name }}</div>
+        </a>
+        {% empty %}<div class="text-secondary small">None pending.</div>{% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="surface-card mt-4">
+  <div class="surface-card-header"><h3 class="surface-card-title">Recent Activity</h3></div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>When</th><th>Asset</th><th>Event</th><th>Summary</th></tr></thead>
+      <tbody>
+      {% for h in history %}
+        <tr>
+          <td style="font-size:0.8rem;">{{ h.created_at|date:"M d, H:i" }}</td>
+          <td><a href="{% url 'assets:detail' h.asset_id %}">{{ h.asset.asset_number }}</a></td>
+          <td><span class="chip">{{ h.get_event_type_display }}</span></td>
+          <td class="small">{{ h.summary }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4"><div class="empty-state py-3"><i class="bi bi-clock-history"></i>No history yet.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

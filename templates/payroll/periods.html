@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Payroll{% endblock %}
+{% block page_title %}Payroll Runs{% endblock %}
+{% block page_subtitle %}Generate and manage payroll periods{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h2 class="section-heading">Payroll periods</h2>
+    <p class="section-subtext mb-0">Each period rolls up attendance data (lateness, absences) into payslip deductions automatically.</p>
+  </div>
+  {% if 'manage_payroll' in perms_set %}
+  <button class="btn btn-amber" data-bs-toggle="modal" data-bs-target="#newPeriodModal"><i class="bi bi-calendar-plus me-1"></i>New Period</button>
+  {% endif %}
+</div>
+
+<div class="surface-card">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Period</th><th>Dates</th><th>Status</th><th>Payslips</th><th>Total net pay</th><th class="text-end">Action</th></tr></thead>
+      <tbody>
+      {% for p in periods %}
+        <tr>
+          <td class="fw-semibold">{{ p.name }}</td>
+          <td>{{ p.start_date|date:"M d" }} – {{ p.end_date|date:"M d, Y" }}</td>
+          <td><span class="status-pill status-{{ p.status }}">{{ p.get_status_display }}</span></td>
+          <td>{{ p.payslips.count }}</td>
+          <td>{{ COMPANY_CURRENCY_SYMBOL }}{{ p.total_net_pay|floatformat:2|intcomma }}</td>
+          <td class="text-end"><a href="{% url 'payroll:period_detail' p.pk %}" class="btn btn-sm btn-light">Open →</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6"><div class="empty-state"><i class="bi bi-cash-coin"></i>No payroll periods yet.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="newPeriodModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post">
+        {% csrf_token %}
+        <div class="modal-header"><h5 class="modal-title font-display">New payroll period</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-3"><label class="form-label small fw-semibold">Name</label>{{ form.name }}</div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Start date</label>{{ form.start_date }}</div>
+          <div class="mb-3"><label class="form-label small fw-semibold">End date</label>{{ form.end_date }}</div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-amber">Create period</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

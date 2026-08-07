@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{{ report.name }}{% endblock %}
+{% block page_title %}{{ report.name }}{% endblock %}
+{% block page_subtitle %}{{ report.get_report_type_display }} · {{ total_rows }} rows{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-4 flex-wrap gap-2">
+  <a href="{% url 'reports:hub' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left"></i> Reports</a>
+  <div class="btn-group">
+    <button class="btn btn-light dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-download me-1"></i>Export</button>
+    <ul class="dropdown-menu">
+      <li><a class="dropdown-item" href="{% url 'reports:export' report.pk %}?format=csv">CSV</a></li>
+      <li><a class="dropdown-item" href="{% url 'reports:export' report.pk %}?format=xlsx">Excel</a></li>
+      <li><a class="dropdown-item" href="{% url 'reports:export' report.pk %}?format=pdf">PDF</a></li>
+      <li><a class="dropdown-item" href="{% url 'reports:export' report.pk %}?format=docx">Word</a></li>
+    </ul>
+  </div>
+</div>
+<div class="surface-card"><div class="table-responsive"><table class="table table-hrms mb-0 datatable"><thead><tr>{% for h in headers %}<th>{{ h }}</th>{% endfor %}</tr></thead><tbody>
+{% for row in rows %}<tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

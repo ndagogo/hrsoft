@@ -1,0 +1,10 @@
+{% extends "recruitment/careers_base.html" %}
+{% block title %}Application received{% endblock %}
+{% block content %}
+<div class="text-center py-5">
+  <i class="bi bi-check-circle text-success display-4"></i>
+  <h1 class="h3 mt-3">Application received</h1>
+  <p class="text-secondary col-md-6 mx-auto">Thank you for applying for <strong>{{ vacancy.title }}</strong>. Our recruitment team will review your application and contact you if you are shortlisted.</p>
+  <a href="{% url 'recruitment:careers' %}" class="btn btn-apply mt-2">Browse other roles</a>
+</div>
+{% endblock %}

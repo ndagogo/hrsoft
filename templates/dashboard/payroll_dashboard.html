@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Payroll Dashboard{% endblock %}
+{% block page_title %}Payroll Dashboard{% endblock %}
+{% block page_subtitle %}Compensation overview · {% now "l, F j" %}{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Current Period Cost" value=total_payroll_cost|floatformat:0|intcomma icon="bi-cash-stack" accent="ink" subtext=current_period.name %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Avg. Net Pay" value=avg_net_pay|floatformat:0|intcomma icon="bi-graph-up" accent="amber" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Payslips Generated" value=pending_payslip_count icon="bi-receipt" accent="teal" %}</div>
+  <div class="col-sm-6 col-xl-3">{% include "partials/_stat_card.html" with eyebrow="Period Status" value=current_period.get_status_display|default:"No period yet" icon="bi-flag-fill" accent="violet" %}</div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-xl-7">
+    <div class="surface-card h-100">
+      <div class="surface-card-header"><h3 class="surface-card-title">Net payroll cost — recent periods</h3></div>
+      <div class="surface-card-body"><canvas id="costChart" height="110"></canvas></div>
+    </div>
+  </div>
+  <div class="col-xl-5">
+    <div class="surface-card h-100">
+      <div class="surface-card-header"><h3 class="surface-card-title">Cost by department</h3></div>
+      <div class="surface-card-body"><canvas id="deptCostChart" height="180"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="surface-card">
+  <div class="surface-card-header">
+    <h3 class="surface-card-title">Recent payroll periods</h3>
+    <a href="{% url 'payroll:periods' %}" class="btn btn-amber btn-sm">Manage periods</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Period</th><th>Range</th><th>Status</th><th>Net Total</th><th></th></tr></thead>
+      <tbody>
+      {% for period in latest_periods %}
+        <tr>
+          <td class="fw-semibold">{{ period.name }}</td>
+          <td>{{ period.start_date|date:"M j" }} – {{ period.end_date|date:"M j, Y" }}</td>
+          <td><span class="status-pill status-{{ period.status }}">{{ period.get_status_display }}</span></td>
+          <td>{{ COMPANY_CURRENCY_SYMBOL }}{{ period.total_net_pay|floatformat:0|intcomma }}</td>
+          <td class="text-end"><a href="{% url 'payroll:period_detail' period.pk %}" class="btn btn-sm btn-outline-dark">View</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="empty-state"><i class="bi bi-cash"></i>No payroll periods yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+new Chart(document.getElementById('costChart'), {
+  type: 'bar',
+  data: { labels: {{ cost_labels|safe }}, datasets: [{ label: 'Net pay', data: {{ cost_trend|safe }}, backgroundColor: '#111a2e', borderRadius: 6 }] },
+  options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f3f9' } }, x: { grid: { display: false } } } }
+});
+new Chart(document.getElementById('deptCostChart'), {
+  type: 'doughnut',
+  data: { labels: {{ dept_cost_labels|safe }}, datasets: [{ data: {{ dept_cost_values|safe }}, backgroundColor: ['#f5a524','#14b8a6','#8b5cf6','#f43f5e','#324269','#22c55e'], borderWidth: 0 }] },
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } }, cutout: '62%' }
+});
+</script>
+{% endblock %}

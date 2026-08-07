@@ -1,0 +1,21 @@
+{% comment %}
+Usage: {% include "partials/_stat_card.html" with eyebrow="Total Employees" value=total_employees icon="bi-people-fill" accent="ink" %}
+accent options: ink, amber, teal, rose, violet, green
+Optional: link="/path/" wraps the card in an anchor.
+{% endcomment %}
+{% if link %}<a href="{{ link }}" class="text-decoration-none text-reset d-block h-100">{% endif %}
+<div class="punch-card">
+  <div class="punch-card-icon" style="background: var(--{{ accent|default:'ink' }}-500, var(--ink-900)); {% if accent == 'amber' %}background:rgba(245,165,36,0.14); color:var(--amber-600);{% elif accent == 'teal' %}background:rgba(20,184,166,0.12); color:var(--teal-500);{% elif accent == 'rose' %}background:rgba(244,63,94,0.12); color:var(--rose-500);{% elif accent == 'violet' %}background:rgba(139,92,246,0.12); color:var(--violet-500);{% elif accent == 'green' %}background:rgba(34,197,94,0.12); color:var(--green-500);{% else %}background:var(--ink-100); color:var(--ink-900);{% endif %}">
+    <i class="bi {{ icon }}"></i>
+  </div>
+  <div class="punch-card-eyebrow">{{ eyebrow }}</div>
+  <div class="punch-card-value">{{ value }}</div>
+  {% if delta %}
+  <div class="punch-card-delta {{ delta_direction|default:'up' }}">
+    <i class="bi bi-arrow-{{ delta_direction|default:'up' }}-short"></i>{{ delta }}
+  </div>
+  {% elif subtext %}
+  <div class="section-subtext mt-2" style="font-size:0.78rem;">{{ subtext }}</div>
+  {% endif %}
+</div>
+{% if link %}</a>{% endif %}

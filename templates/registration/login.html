@@ -1,0 +1,90 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign in · {{ COMPANY_NAME }} HR</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<link rel="stylesheet" href="{% static 'css/hrms.css' %}">
+<style>
+  body { font-family: var(--font-body); min-height: 100vh; display:flex; background: var(--ink-950); }
+  .login-aside {
+    flex: 1.1; background:
+      radial-gradient(circle at 20% 20%, rgba(245,165,36,0.16), transparent 45%),
+      var(--ink-950);
+    color: #fff; display: flex; flex-direction: column; justify-content: space-between;
+    padding: 3rem; position: relative; overflow: hidden;
+  }
+  .login-aside .punch-strip { position:absolute; left:0; top:0; bottom:0; width:14px;
+    background-image: radial-gradient(circle, rgba(255,255,255,0.18) 3px, transparent 3px);
+    background-size: 14px 22px; }
+  .login-form-wrap { flex: 1; display: flex; align-items: center; justify-content: center; background: #fff; padding: 2rem; }
+  .login-card { max-width: 380px; width: 100%; }
+  .clock-display { font-family: var(--font-display); font-size: 3rem; font-weight: 600; letter-spacing: -0.02em; }
+  @media (max-width: 900px) { .login-aside { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="login-aside">
+  <div class="punch-strip"></div>
+  <div>
+    <div class="d-flex align-items-center gap-2 mb-5">
+      <div class="sidebar-brand-mark">HR</div>
+      <span class="fw-semibold">{{ COMPANY_NAME }}</span>
+    </div>
+  </div>
+  <div>
+    <div class="chip mb-3" style="background:rgba(255,255,255,0.1); color:#fff;"><i class="bi bi-fingerprint"></i> Biometric-verified attendance</div>
+    <h1 class="font-display fw-semibold mb-3" style="font-size:2.1rem; max-width:420px;">Every clock-in, role, and payslip — one ledger of record.</h1>
+    <p style="color: rgba(255,255,255,0.6); max-width: 400px;">Enterprise HR for teams that take time, access and payroll seriously.</p>
+  </div>
+  <div style="color: rgba(255,255,255,0.4); font-size: 0.8rem;">© {% now "Y" %} {{ COMPANY_NAME }}. All rights reserved.</div>
+</div>
+
+<div class="login-form-wrap">
+  <div class="login-card">
+    <h2 class="font-display fw-semibold mb-1">Welcome back</h2>
+    <p class="section-subtext mb-4">Sign in to your HR workspace.</p>
+
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold" style="font-size:0.85rem;">Username</label>
+        {{ form.username }}
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold" style="font-size:0.85rem;">Password</label>
+        {{ form.password }}
+      </div>
+      <button type="submit" class="btn btn-amber w-100 py-2 fw-semibold mt-2">Sign in</button>
+    </form>
+    <div class="text-center mt-3"><a href="{% url 'accounts:password_reset' %}" class="small text-secondary">Forgot password?</a></div>
+
+    <div class="surface-card mt-4 p-3" style="background:var(--ink-50); border:1px dashed var(--border-soft);">
+      <div class="fw-semibold mb-2" style="font-size:0.8rem;"><i class="bi bi-info-circle me-1"></i>Demo accounts</div>
+      <div style="font-size:0.78rem; color:var(--text-secondary); line-height:1.6;">
+        admin / Demo@1234 — Administrator<br>
+        hr.manager / Demo@1234 — HR Manager<br>
+        dept.manager / Demo@1234 — Department Manager<br>
+        payroll.officer / Demo@1234 — Payroll Officer<br>
+        employee1 / Demo@1234 — Employee
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block page_title %}Reports & Analytics{% endblock %}
+{% block page_subtitle %}Organization-wide insights{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-4">
+  <a href="{% url 'reports:builder' %}" class="btn btn-amber btn-sm"><i class="bi bi-plus-lg me-1"></i>Custom report</a>
+</div>
+<div class="row g-3 mb-4">
+  <div class="col-md-3">{% include "partials/_stat_card.html" with eyebrow="Employees" value=total_employees icon="bi-people-fill" accent="ink" %}</div>
+  <div class="col-md-3">{% include "partials/_stat_card.html" with eyebrow="Present Today" value=present_today icon="bi-check-circle-fill" accent="green" %}</div>
+  <div class="col-md-3">{% include "partials/_stat_card.html" with eyebrow="Pending Leave" value=pending_leave icon="bi-calendar2-event-fill" accent="violet" %}</div>
+  <div class="col-md-3">{% include "partials/_stat_card.html" with eyebrow="Payslips" value=total_payroll icon="bi-receipt" accent="amber" %}</div>
+</div>
+<div class="row g-3">
+  <div class="col-xl-6"><div class="surface-card h-100"><div class="surface-card-header"><h3 class="surface-card-title">Gender Distribution</h3></div><div class="surface-card-body"><div id="genderChart"></div></div></div></div>
+  <div class="col-xl-6"><div class="surface-card h-100"><div class="surface-card-header"><h3 class="surface-card-title">Department Headcount</h3></div><div class="surface-card-body"><div id="deptChart"></div></div></div></div>
+</div>
+{% if saved_reports %}
+<div class="surface-card mt-4"><div class="surface-card-header"><h3 class="surface-card-title">Saved reports</h3></div>
+<div class="table-responsive"><table class="table table-hrms mb-0"><thead><tr><th>Name</th><th>Type</th><th>Updated</th><th></th></tr></thead><tbody>
+{% for r in saved_reports %}<tr><td class="fw-semibold">{{ r.name }}</td><td>{{ r.get_report_type_display }}</td><td>{{ r.updated_at|date:"M d, Y" }}</td><td><a href="{% url 'reports:detail' r.pk %}" class="btn btn-sm btn-light">Open</a></td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endif %}
+{% endblock %}
+{% block extra_js %}
+<script>
+const genderData = {{ gender_data|safe }};
+const deptData = {{ dept_data|safe }};
+if (typeof ApexCharts !== 'undefined') {
+  new ApexCharts(document.querySelector('#genderChart'), { chart:{type:'donut',height:280}, series:genderData.map(g=>g.c), labels:genderData.map(g=>g.gender||'Unknown'), colors:['#f5a524','#14b8a6','#8b5cf6','#324269'] }).render();
+  new ApexCharts(document.querySelector('#deptChart'), { chart:{type:'bar',height:280}, series:[{name:'Employees',data:deptData.map(d=>d.c)}], xaxis:{categories:deptData.map(d=>d.name)} }).render();
+}
+</script>
+{% endblock %}

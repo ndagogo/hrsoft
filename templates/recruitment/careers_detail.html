@@ -1,0 +1,45 @@
+{% extends "recruitment/careers_base.html" %}
+{% block title %}{{ vacancy.title }}{% endblock %}
+{% block content %}
+<div class="pt-4 mb-3"><a href="{% url 'recruitment:careers' %}" class="text-decoration-none small"><i class="bi bi-arrow-left"></i> All roles</a></div>
+<div class="row g-4">
+  <div class="col-lg-7">
+    <h1 class="h2">{{ vacancy.title }}</h1>
+    <p class="text-secondary">
+      {{ vacancy.department.name|default:"—" }}
+      {% if vacancy.branch %} · {{ vacancy.branch.name }}{% endif %}
+      · {{ vacancy.get_employment_type_display }} · {{ vacancy.get_work_mode_display }}
+    </p>
+    {% if vacancy.show_salary and vacancy.min_salary %}
+    <p class="fw-semibold">Salary range: {{ vacancy.min_salary }}{% if vacancy.max_salary %} – {{ vacancy.max_salary }}{% endif %}</p>
+    {% endif %}
+    <h2 class="h5 mt-4">About the role</h2>
+    <div class="mb-3" style="white-space:pre-wrap;">{{ vacancy.description }}</div>
+    {% if vacancy.responsibilities %}
+    <h2 class="h5">Responsibilities</h2>
+    <div class="mb-3" style="white-space:pre-wrap;">{{ vacancy.responsibilities }}</div>
+    {% endif %}
+    {% if vacancy.requirements %}
+    <h2 class="h5">Requirements</h2>
+    <div class="mb-3" style="white-space:pre-wrap;">{{ vacancy.requirements }}</div>
+    {% endif %}
+  </div>
+  <div class="col-lg-5">
+    <div class="role-card">
+      <h2 class="h5 mb-3">Apply now</h2>
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+          {{ field }}
+          {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+          {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+        </div>
+        {% endfor %}
+        <button type="submit" class="btn btn-apply w-100">Submit application</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

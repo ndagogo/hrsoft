@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block page_title %}Notifications{% endblock %}
+{% block page_subtitle %}Your in-app notification center{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <p class="section-subtext mb-0">Click a notification to open it and mark it as read.</p>
+  <form method="post" action="{% url 'notifications:mark_all_read' %}">{% csrf_token %}
+    <button type="submit" class="btn btn-light btn-sm">Mark all read</button>
+  </form>
+</div>
+<div class="surface-card">
+  <div class="surface-card-body p-0">
+    {% for n in notifications %}
+    <a href="{% url 'notifications:open' n.pk %}" class="notif-item {% if not n.is_read %}unread{% endif %} d-block p-3 text-decoration-none text-reset">
+      <div class="d-flex justify-content-between gap-2">
+        <div class="fw-semibold">{{ n.title }}</div>
+        {% if not n.is_read %}<span class="chip" style="font-size:0.68rem;">New</span>{% endif %}
+      </div>
+      <div class="text-secondary small">{{ n.message }}</div>
+      <div class="text-secondary" style="font-size:0.72rem;">{{ n.created_at|timesince }} ago</div>
+    </a>
+    {% empty %}
+    <div class="empty-state"><i class="bi bi-bell"></i>No notifications yet.</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

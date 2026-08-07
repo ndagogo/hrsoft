@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Login History{% endblock %}
+{% block page_title %}Device Login History{% endblock %}
+{% block page_subtitle %}Recent sign-in activity on your account{% endblock %}
+{% block content %}
+<div class="surface-card"><div class="table-responsive"><table class="table table-hrms mb-0 datatable"><thead><tr><th>Date</th><th>IP Address</th><th>Device</th><th>Status</th></tr></thead><tbody>
+{% for h in history %}<tr><td>{{ h.login_at|date:"M d, Y H:i" }}</td><td>{{ h.ip_address|default:"—" }}</td><td>{{ h.device }}</td><td>{% if h.success %}<span class="status-pill status-present">Success</span>{% else %}<span class="status-pill status-absent">Failed</span>{% endif %}</td></tr>{% empty %}<tr><td colspan="4"><div class="empty-state"><i class="bi bi-clock-history"></i>No login history yet.</div></td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

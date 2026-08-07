@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Return Asset{% endblock %}
+{% block page_title %}Asset Return & Inspection{% endblock %}
+{% block page_subtitle %}{{ assignment.asset.name }} from {{ assignment.employee.full_name }}{% endblock %}
+{% block content %}
+<div class="mb-4"><a href="{% url 'assets:detail' assignment.asset_id %}" class="btn btn-light btn-sm">Back</a></div>
+<div class="surface-card surface-card-body" style="max-width:560px;">
+  <form method="post">{% csrf_token %}
+    {% for field in form %}
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">{{ field.label }}</label>
+      {{ field }}
+    </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary">Complete Return</button>
+  </form>
+</div>
+{% endblock %}
