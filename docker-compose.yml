@@ -1,0 +1,66 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-hrms_db}
+      POSTGRES_USER: ${DB_USER:-hrms_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-hrms_user} -d ${DB_NAME:-hrms_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  web:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DJANGO_DB_ENGINE: postgres
+      DB_HOST: db
+      DB_PORT: "5432"
+      DJANGO_BEHIND_PROXY: "True"
+      DJANGO_SERVE_MEDIA: "False"
+      # Default stack terminates HTTP only. Set True once TLS is in front of nginx.
+      DJANGO_SECURE_SSL_REDIRECT: ${DJANGO_SECURE_SSL_REDIRECT:-False}
+      DJANGO_SECURE_COOKIES: ${DJANGO_SECURE_COOKIES:-False}
+      GUNICORN_BIND: "0.0.0.0:8000"
+    volumes:
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+      - logs_data:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/healthz/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - static_data:/var/www/static:ro
+      - media_data:/var/www/media:ro
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  media_data:
+  static_data:
+  logs_data:

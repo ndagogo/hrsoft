@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Training Reports{% endblock %}
+{% block page_title %}Reports & Analytics{% endblock %}
+{% block content %}
+{% include "training/_ld_nav.html" %}
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><div class="surface-card surface-card-body"><div class="text-secondary small">Completion rate</div><div class="fs-3 fw-semibold">{{ stats.completion_rate }}%</div></div></div>
+  <div class="col-md-3"><div class="surface-card surface-card-body"><div class="text-secondary small">Mandatory assigned</div><div class="fs-3 fw-semibold">{{ compliance.assigned }}</div></div></div>
+  <div class="col-md-3"><div class="surface-card surface-card-body"><div class="text-secondary small">Mandatory completed</div><div class="fs-3 fw-semibold">{{ compliance.completed }}</div></div></div>
+  <div class="col-md-3"><div class="surface-card surface-card-body"><div class="text-secondary small">Mandatory overdue</div><div class="fs-3 fw-semibold text-danger">{{ compliance.overdue }}</div></div></div>
+</div>
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title mb-0">Training hours by department</h3></div>
+      <div class="table-responsive"><table class="table table-hrms mb-0">
+        <thead><tr><th>Department</th><th>People</th><th>Hours</th></tr></thead>
+        <tbody>{% for r in dept_hours %}<tr><td>{{ r.employee__department__name|default:"—" }}</td><td>{{ r.people }}</td><td>{{ r.hours|default:0 }}</td></tr>{% empty %}<tr><td colspan="3" class="text-secondary">No data.</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title mb-0">Expense by department ({{ year }})</h3></div>
+      <div class="table-responsive"><table class="table table-hrms mb-0">
+        <thead><tr><th>Department</th><th>Amount</th></tr></thead>
+        <tbody>{% for r in costs %}<tr><td>{{ r.department__name|default:"Unallocated" }}</td><td>{{ COMPANY_CURRENCY_SYMBOL }}{{ r.total }}</td></tr>{% empty %}<tr><td colspan="2" class="text-secondary">No expenses logged yet.</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

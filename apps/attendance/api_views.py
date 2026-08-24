@@ -18,29 +18,33 @@ logger = logging.getLogger("apps.attendance.biometrics")
 @require_POST
 def biometric_webhook(request):
     """
-    PUSH MODE endpoint. Configure the HikVision device (Configuration >
-    Network > Advanced Settings > HTTP Listening or an event-linkage
-    "notify surveillance center" rule) to POST here.
+    Legacy PUSH MODE endpoint (HikVision-shaped payloads).
 
-    Accepts either:
-      - multipart/form-data with an `event_log` field containing JSON
-        (HikVision's classic ISAPI event-notification format), or
-      - a raw JSON body (some firmware / "EventFormat: JSON" configs).
-
-    Auth: a shared secret must be supplied either as `?token=...` query
-    param or `X-Webhook-Token` header, checked against the device's
-    configured webhook_token (or the platform-wide fallback secret).
-    Device is identified by source IP.
+    Auth: per-device webhook token via ?token= or X-Webhook-Token.
+    Device is resolved by token first (works remotely / behind NAT), with
+    source-IP matching kept as a fallback for older LAN-only setups.
     """
-    device_ip = request.META.get("REMOTE_ADDR")
-    device = BiometricDevice.objects.filter(ip_address=device_ip, is_active=True).first()
+    token = request.GET.get("token") or request.headers.get("X-Webhook-Token", "")
+    device = None
+    if token:
+        from .biometrics import resolve_device_from_token
+        device = resolve_device_from_token(token)
 
     if not device:
-        logger.warning("Webhook from unknown device IP: %s", device_ip)
+        device_ip = request.META.get("REMOTE_ADDR")
+        xff = request.META.get("HTTP_X_FORWARDED_FOR")
+        if xff:
+            device_ip = xff.split(",")[0].strip()
+        device = BiometricDevice.objects.filter(ip_address=device_ip, is_active=True).first()
+        if device and token and not verify_webhook_token(device, token):
+            logger.warning("Webhook auth failed for device %s", device)
+            return JsonResponse({"detail": "Invalid token"}, status=401)
+
+    if not device:
+        logger.warning("Webhook from unknown device")
         return JsonResponse({"detail": "Unknown device"}, status=403)
 
-    token = request.GET.get("token") or request.headers.get("X-Webhook-Token", "")
-    if not verify_webhook_token(device, token):
+    if token and not verify_webhook_token(device, token):
         logger.warning("Webhook auth failed for device %s", device)
         return JsonResponse({"detail": "Invalid token"}, status=401)
 
@@ -62,7 +66,7 @@ def biometric_webhook(request):
         return JsonResponse({"detail": "No parseable event payload"}, status=400)
 
     log = process_webhook_payload(device, payload)
-    return JsonResponse({"detail": "ok", "ingested": bool(log)})
+    return JsonResponse({"detail": "ok", "ingested": bool(log), "punch_id": log.pk if log else None})
 
 
 @permission_required("manage_devices")
@@ -93,3 +97,45 @@ def test_device_connection_view(request, pk):
     else:
         messages.error(request, f"Connection failed: {message}")
     return redirect("attendance:devices")
+
+
+def _ui_device_action(request, pk, command):
+    from .device_sync import execute_or_queue
+
+    device = get_object_or_404(BiometricDevice, pk=pk)
+    force_queue = request.POST.get("queue") == "1"
+    try:
+        result = execute_or_queue(device, command, user=request.user, force_queue=force_queue)
+    except Exception as exc:
+        logger.exception("Device action %s failed for device %s", command, pk)
+        messages.error(
+            request,
+            f"Could not reach device {device.name} ({device.endpoint_label}): {exc}",
+        )
+        return redirect("attendance:devices")
+    if result.get("ok"):
+        messages.success(request, result.get("message") or f"{command} completed.")
+    else:
+        messages.error(request, result.get("detail") or result.get("message") or f"{command} failed.")
+    return redirect("attendance:devices")
+
+
+@permission_required("manage_devices")
+@require_POST
+def ui_pull_staff(request, pk):
+    from .models import DeviceCommandType
+    return _ui_device_action(request, pk, DeviceCommandType.PULL_STAFF)
+
+
+@permission_required("manage_devices")
+@require_POST
+def ui_push_staff(request, pk):
+    from .models import DeviceCommandType
+    return _ui_device_action(request, pk, DeviceCommandType.PUSH_STAFF)
+
+
+@permission_required("manage_devices")
+@require_POST
+def ui_pull_attendance(request, pk):
+    from .models import DeviceCommandType
+    return _ui_device_action(request, pk, DeviceCommandType.PULL_ATTENDANCE)

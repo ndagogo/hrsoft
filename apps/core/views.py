@@ -1,11 +1,23 @@
 from django.contrib.auth.decorators import login_required
+from django.db import connection
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.views.decorators.http import require_GET
 
 from apps.employees.models import Employee
 from apps.documents.models import Document
 from apps.attendance.models import AttendanceRecord
+
+
+@require_GET
+def healthz(request):
+    """Lightweight liveness/readiness probe for load balancers and Docker HEALTHCHECK."""
+    try:
+        connection.ensure_connection()
+    except Exception:
+        return JsonResponse({"status": "error", "database": "unavailable"}, status=503)
+    return JsonResponse({"status": "ok", "database": "ok"})
 
 
 @login_required

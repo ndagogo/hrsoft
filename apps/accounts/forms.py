@@ -36,19 +36,8 @@ class HRMSPasswordResetForm(PasswordResetForm):
     )
 
     def clean_email(self):
-        email = (self.cleaned_data.get("email") or "").strip()
-        UserModel = get_user_model()
-        if not UserModel.objects.filter(email__iexact=email).exists():
-            raise ValidationError(
-                "This email doesn't exist in our system. Please check and try again.",
-                code="email_not_found",
-            )
-        if not UserModel.objects.filter(email__iexact=email, is_active=True).exists():
-            raise ValidationError(
-                "This account is inactive. Contact your administrator.",
-                code="inactive",
-            )
-        return email
+        # Normalize only — never reveal whether the address exists (enumeration).
+        return (self.cleaned_data.get("email") or "").strip()
 
 
 class HRMSSetPasswordForm(SetPasswordForm):

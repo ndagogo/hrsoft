@@ -105,10 +105,13 @@
       </a>
       {% endif %}
       {% if 'view_training' in perms_set %}
-      <a href="{% url 'training:overview' %}" class="sidebar-link {% if request.resolver_match.app_name == 'training' %}active{% endif %}">
-        <i class="bi bi-mortarboard-fill"></i> Training
+      <a href="{% url 'training:dashboard' %}" class="sidebar-link {% if request.resolver_match.app_name == 'training' and request.resolver_match.url_name != 'my_learning' %}active{% endif %}">
+        <i class="bi bi-mortarboard-fill"></i> Learning &amp; Development
       </a>
       {% endif %}
+      <a href="{% url 'training:my_learning' %}" class="sidebar-link {% if request.resolver_match.url_name == 'my_learning' %}active{% endif %}">
+        <i class="bi bi-journal-check"></i> My Learning
+      </a>
 
       <div class="sidebar-section-label">Finance & Assets</div>
       {% if 'view_payroll' in perms_set %}

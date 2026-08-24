@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}My Learning{% endblock %}
+{% block page_title %}My Learning{% endblock %}
+{% block page_subtitle %}Assignments, history, certificates and development gaps{% endblock %}
+{% block content %}
+{% include "training/_ld_nav.html" %}
+<div class="mb-3"><a href="{% url 'training:request_training' %}" class="btn btn-amber"><i class="bi bi-plus-lg me-1"></i>Request Training</a></div>
+
+{% if video_courses %}
+<div class="surface-card mb-3">
+  <div class="surface-card-header"><h3 class="surface-card-title mb-0">Video courses</h3></div>
+  <div class="surface-card-body">
+    <div class="row g-3">
+      {% for item in video_courses %}
+      <div class="col-md-6 col-xl-4">
+        <div class="border rounded-3 p-3 h-100">
+          <div class="fw-semibold mb-1">{{ item.course.title }}</div>
+          <div class="small text-secondary mb-2">{{ item.progress.total }} lesson{{ item.progress.total|pluralize }} · {{ item.course.get_delivery_method_display }}</div>
+          <div class="progress mb-2" style="height:8px;"><div class="progress-bar bg-warning" style="width: {{ item.progress.percent }}%"></div></div>
+          <div class="small text-secondary mb-2">{{ item.progress.completed }}/{{ item.progress.total }} complete ({{ item.progress.percent }}%)</div>
+          <a href="{% url 'training:watch_course' item.course.pk %}" class="btn btn-ink btn-sm"><i class="bi bi-play-fill me-1"></i>Watch &amp; learn</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title mb-0">Assignments</h3></div>
+      <div class="surface-card-body">
+        {% for a in assignments %}
+          <div class="d-flex justify-content-between py-2 border-bottom">
+            <div><div class="fw-semibold">{{ a.course.title }}</div><div class="small text-secondary">{{ a.get_status_display }} · Due {{ a.due_date|default:"—" }}</div></div>
+            {% if a.is_mandatory %}<span class="status-pill status-late">Mandatory</span>{% endif %}
+          </div>
+        {% empty %}<div class="text-secondary">No open assignments.</div>{% endfor %}
+      </div>
+    </div>
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title mb-0">Competency gaps</h3></div>
+      <div class="surface-card-body">
+        {% for g in gaps %}
+          <div class="mb-3">
+            <div class="d-flex justify-content-between"><strong>{{ g.competency.name }}</strong><span>Gap {{ g.gap }} ({{ g.current_level }}/{{ g.required_level }})</span></div>
+            <div class="small text-secondary">Recommended: {{ g.recommended_course|default:"Identify a suitable course" }}</div>
+          </div>
+        {% empty %}<div class="text-secondary">No gaps against your position requirements.</div>{% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title mb-0">Training history</h3></div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Course</th><th>Status</th><th>Score</th></tr></thead>
+          <tbody>
+          {% for e in enrollments %}
+            <tr><td>{{ e.schedule.course.title }}</td><td>{{ e.get_status_display }}</td><td>{{ e.evaluation_score|default:"—" }}</td></tr>
+          {% empty %}<tr><td colspan="3" class="text-secondary">No history yet.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title mb-0">Certificates</h3></div>
+      <div class="surface-card-body">
+        {% for c in certificates %}
+          <div class="py-2 border-bottom">
+            <div class="fw-semibold">{{ c.enrollment.schedule.course.title }}</div>
+            <div class="small text-secondary">{{ c.certificate_number }} · Issued {{ c.issued_date }}{% if c.expiry_date %} · Expires {{ c.expiry_date }}{% endif %} · {{ c.get_status_display }}</div>
+          </div>
+        {% empty %}<div class="text-secondary">No certificates yet.</div>{% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

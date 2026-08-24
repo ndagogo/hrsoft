@@ -118,10 +118,73 @@ how much demo data is generated.)
 
 ---
 
-## 🔌 HikVision biometric device integration
+## 📡 Biometric Device Hub (single API)
 
-The platform supports **both** integration modes, configured per-device under
-**Attendance → Biometric Devices** in the UI (Admin/HR Manager only):
+One base URL for **full** device ↔ HRMS communication. Enter this on the
+terminal / cloud-bridge:
+
+```text
+https://<your-server>/api/v1/device/
+Token: <device webhook_token>
+Header: Authorization: Bearer <device webhook_token>
+```
+
+Register the device under **Attendance → Biometric Devices**. From that screen
+you can **Pull staff**, **Push staff**, and **Pull punches** (clock-in /
+clock-out). For ZKTeco on the LAN those actions talk to the device directly;
+for remote/push devices they are queued and picked up when the device polls
+`/api/v1/device/commands/`.
+
+### Device-facing endpoints (Bearer token)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET`/`POST` | `/api/v1/device/` | Handshake + endpoint map |
+| `GET`/`POST` | `/api/v1/device/heartbeat/` | Keep-alive |
+| `GET` | `/api/v1/device/staff/` | **Push staff → device** (device downloads HRMS IDs) |
+| `POST` | `/api/v1/device/staff/` | **Pull staff ← device** (device uploads enrolled IDs) |
+| `POST` | `/api/v1/device/punches/` | Upload one clock-in / clock-out |
+| `POST` | `/api/v1/device/punches/batch/` | Upload many punches |
+| `GET` | `/api/v1/device/commands/` | Poll software commands |
+| `POST` | `/api/v1/device/commands/<id>/result/` | Report command result |
+
+### Software-facing endpoints (logged-in + `manage_devices`)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/api/v1/device/manage/<id>/pull-staff/` | Pull staff IDs from device |
+| `POST` | `/api/v1/device/manage/<id>/push-staff/` | Push HRMS staff IDs to device |
+| `POST` | `/api/v1/device/manage/<id>/pull-attendance/` | Pull punches from device |
+| `GET` | `/api/v1/device/manage/<id>/punches/` | List stored punches (`?direction=in\|out`) |
+| `GET` | `/api/v1/device/manage/<id>/staff/` | Staff snapshot on device |
+| `GET` | `/api/v1/device/manage/<id>/status/` | Device status |
+
+### Punch upload example
+
+```bash
+curl -X POST https://hrms.example.com/api/v1/device/punches/ \
+  -H "Authorization: Bearer YOUR_DEVICE_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "staff_id": "1024",
+    "timestamp": "2026-08-12T09:02:14+01:00",
+    "direction": "in",
+    "method": "face",
+    "event_id": "optional-unique-id"
+  }'
+```
+
+`staff_id` / `employee_no` must match the employee’s **Biometric ID** in HRMS.
+`direction`: `in` (clock-in) or `out` (clock-out). `event_id` makes retries safe.
+
+Vendor-native HikVision webhook (`/api/biometric/webhook/`) remains supported.
+
+---
+
+## 🔌 HikVision / ZKTeco LAN integration
+
+The platform also supports classic **pull** and vendor **push** modes,
+configured per-device under **Attendance → Biometric Devices**:
 
 ### Pull mode (Django polls the device)
 1. Register the device with its IP, ISAPI port (usually 80), and
@@ -137,26 +200,23 @@ This calls `POST /ISAPI/AccessControl/AcsEvent?format=json` on the device to
 fetch new access-control events since the last sync.
 
 ### Push mode (device posts events to us)
-1. Register the device (IP address is used to identify incoming webhook
-   calls) and copy its **webhook token** from the device card.
-2. On the HikVision device's own web UI: **Configuration → Network →
-   Advanced Settings → HTTP Listening** (or configure an event-linkage
-   "notify surveillance center" rule), and set the destination URL to:
+1. Register the device and copy its **webhook token** from the device card.
+2. Prefer the device-agnostic API above, or for HikVision-native payloads set
+   the destination URL to:
    ```
    http://<your-server>/api/biometric/webhook/?token=<device-webhook-token>
    ```
-3. Events arrive in real time and are matched to employees by the
-   `biometric_id` field on their Employee profile (must match the device's
-   enrolled Employee No.).
+3. Events are matched to employees by the `biometric_id` field on their
+   Employee profile (must match the device’s enrolled Employee No.).
 
 Both modes write to the same `RawPunchLog` table and roll up into daily
-`AttendanceRecord`s — see `apps/attendance/biometrics.py` for the full
-implementation and inline documentation of the HikVision payload shapes.
+`AttendanceRecord`s — see `apps/attendance/biometrics.py`.
 
 > **Note:** the demo device registered by `seed_demo_data` uses a fake IP
 > (`192.168.1.201`) and synthetic punch history — it's there so the UI has
 > something to show, not a live connection. Point a real device at your
 > server's IP and update the device record to go live.
+
 
 ---
 
@@ -191,13 +251,92 @@ payslips, printable payslip view) doesn't need to change.
 
 ---
 
-## 📦 Deployment notes
+## 📦 Production deployment
 
-- Set `DJANGO_DEBUG=False` and a strong `DJANGO_SECRET_KEY` in production.
-- `whitenoise` and `gunicorn` are included in `requirements.txt` for a
-  straightforward production static-file + WSGI setup.
-- Run `python manage.py collectstatic` before deploying.
-- The webhook endpoint (`/api/biometric/webhook/`) is CSRF-exempt by
-  necessity (the device can't supply a Django CSRF token) but is protected by
-  a per-device shared secret token plus source-IP matching — make sure your
-  firewall only allows the expected device IPs to reach it in production.
+This project ships with a production stack: **Gunicorn + WhiteNoise + nginx +
+PostgreSQL**, Docker Compose, hardened Django settings, a `/healthz/` probe,
+and error pages (403/404/500).
+
+### Production checklist
+
+1. Copy `.env.example` → `.env` and set:
+   - `DJANGO_DEBUG=False`
+   - a strong `DJANGO_SECRET_KEY` (never commit it)
+   - `DJANGO_ALLOWED_HOSTS` to your real domain(s)
+   - `DJANGO_CSRF_TRUSTED_ORIGINS=https://your-domain`
+   - `DJANGO_DB_ENGINE=postgres` with a strong `DB_PASSWORD`
+   - SMTP settings (`EMAIL_HOST`, etc.) so password reset works
+2. Prefer **HTTPS**. When TLS terminates in front of the app, set:
+   - `DJANGO_SECURE_SSL_REDIRECT=True`
+   - `DJANGO_SECURE_COOKIES=True`
+3. Run migrations and collect static files (Docker entrypoint does this).
+4. Create a real superuser — do **not** ship demo accounts to production.
+5. Restrict the biometric webhook (`/api/biometric/webhook/`) at the firewall
+   to device IPs only (CSRF-exempt but token + source-IP protected).
+6. Schedule biometric pull sync (see `scripts/biometric_sync.cron`).
+
+### Option A — Docker Compose (recommended)
+
+```bash
+cp .env.example .env
+# Edit .env: DJANGO_DEBUG=False, secret key, hosts, CSRF origins, DB password, SMTP
+
+# Linux / macOS:
+chmod +x scripts/entrypoint.sh scripts/deploy.sh
+./scripts/deploy.sh
+
+# Or manually:
+docker compose up -d --build
+```
+
+Services:
+
+| Service | Role |
+|---------|------|
+| `db` | PostgreSQL 16 |
+| `web` | Django + Gunicorn |
+| `nginx` | Reverse proxy, static + media |
+
+Health check: `http://<host>/healthz/`
+
+Create the first admin user:
+
+```bash
+docker compose exec web python manage.py createsuperuser
+```
+
+For HTTPS on a VPS, put TLS in front of nginx (Cloudflare, Caddy, or
+`deploy/nginx.ssl.conf.example` + Certbot), then flip
+`DJANGO_SECURE_SSL_REDIRECT` / `DJANGO_SECURE_COOKIES` to `True`.
+
+### Option B — Bare metal (systemd + nginx)
+
+```bash
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env   # production values, DJANGO_DB_ENGINE=postgres
+python manage.py migrate
+python manage.py collectstatic --noinput
+python manage.py createsuperuser
+python manage.py check --deploy
+```
+
+- Use `gunicorn -c gunicorn.conf.py config.wsgi:application`
+- Install `deploy/hrms.service.example` as a systemd unit
+- Point nginx at Gunicorn using `deploy/nginx.ssl.conf.example`
+- Set `DJANGO_SERVE_MEDIA=False` when nginx serves `/media/`
+
+### Hardening already enabled when `DJANGO_DEBUG=False`
+
+- Refuses insecure `SECRET_KEY`, empty/`*` `ALLOWED_HOSTS`, and SQLite
+- Secure cookies / SSL redirect / HSTS (when HTTPS flags are on)
+- `SECURE_CONTENT_TYPE_NOSNIFF`, `X_FRAME_OPTIONS=DENY`, referrer policy
+- Rotating application logs under `logs/`
+- Compressed hashed static files via WhiteNoise
+- Login required by default (`LoginRequiredMiddleware`) + audit trail
+
+### What not to do in production
+
+- Do not run `python manage.py runserver`
+- Do not run `seed_demo_data` on a live company database
+- Do not commit `.env`, `db.sqlite3`, `media/`, or `logs/`

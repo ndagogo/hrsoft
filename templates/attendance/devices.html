@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Biometric Devices{% endblock %}
 {% block page_title %}Biometric Devices{% endblock %}
-{% block page_subtitle %}ZKTeco (TCP 4370) &amp; HikVision attendance terminals{% endblock %}
+{% block page_subtitle %}Any brand via remote API — plus ZKTeco / HikVision LAN sync{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
@@ -30,9 +30,10 @@
 
       <div style="font-size:0.83rem;">
         <div class="d-flex justify-content-between py-1"><span class="text-secondary">Brand</span><span class="fw-semibold">{{ device.get_brand_display }}</span></div>
-        <div class="d-flex justify-content-between py-1"><span class="text-secondary">IP address</span><span class="fw-semibold">{{ device.ip_address }}:{{ device.port }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Endpoint</span><span class="fw-semibold">{{ device.endpoint_label }}</span></div>
         <div class="d-flex justify-content-between py-1"><span class="text-secondary">Mode</span><span class="fw-semibold">{{ device.get_connection_mode_display }}</span></div>
         <div class="d-flex justify-content-between py-1"><span class="text-secondary">Last sync</span><span class="fw-semibold">{{ device.last_sync_at|date:"M d, H:i"|default:"Never" }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Last seen</span><span class="fw-semibold">{{ device.last_seen_at|date:"M d, H:i"|default:"—" }}</span></div>
       </div>
 
       {% if device.last_sync_status == "error" %}
@@ -44,14 +45,20 @@
       <div class="d-flex gap-2 mt-3 pt-3 border-top flex-wrap">
         <form method="post" action="{% url 'biometric_api:test_connection' device.pk %}">
           {% csrf_token %}
-          <button class="btn btn-sm btn-light"><i class="bi bi-broadcast-pin me-1"></i>Test</button>
+          <button class="btn btn-sm btn-light" title="Test connection"><i class="bi bi-broadcast-pin me-1"></i>Test</button>
         </form>
-        {% if device.connection_mode == "pull" or device.connection_mode == "both" %}
-        <form method="post" action="{% url 'biometric_api:manual_sync' device.pk %}" class="flex-grow-1">
+        <form method="post" action="{% url 'biometric_api:ui_pull_staff' device.pk %}">
           {% csrf_token %}
-          <button class="btn btn-sm btn-ink w-100"><i class="bi bi-arrow-repeat me-1"></i>Sync now</button>
+          <button class="btn btn-sm btn-light" title="Pull staff IDs from device"><i class="bi bi-people me-1"></i>Pull staff</button>
         </form>
-        {% endif %}
+        <form method="post" action="{% url 'biometric_api:ui_push_staff' device.pk %}">
+          {% csrf_token %}
+          <button class="btn btn-sm btn-light" title="Push HRMS staff IDs to device"><i class="bi bi-person-plus me-1"></i>Push staff</button>
+        </form>
+        <form method="post" action="{% url 'biometric_api:ui_pull_attendance' device.pk %}">
+          {% csrf_token %}
+          <button class="btn btn-sm btn-ink" title="Pull punches (clock-in / clock-out)"><i class="bi bi-fingerprint me-1"></i>Pull punches</button>
+        </form>
         <button class="btn btn-sm btn-light" type="button" data-bs-toggle="collapse" data-bs-target="#webhookInfo{{ device.pk }}"><i class="bi bi-info-circle"></i></button>
         <button class="btn btn-sm btn-light" type="button" data-bs-toggle="modal" data-bs-target="#editDeviceModal{{ device.pk }}"><i class="bi bi-gear"></i></button>
         <form method="post" action="{% url 'attendance:device_delete' device.pk %}" onsubmit="return confirm('Remove {{ device.name }}? Historic punches stay on record.');">
@@ -61,19 +68,27 @@
 
       <div class="collapse mt-3" id="webhookInfo{{ device.pk }}">
         <div class="p-3 rounded" style="background:var(--ink-50); font-size:0.76rem;">
-          {% if device.brand == "zkteco" %}
-          <div class="fw-semibold mb-1">ZKTeco pull settings (match the device Ethernet screen):</div>
+          <div class="fw-semibold mb-1">Device Hub URL (enter on the biometric device / bridge)</div>
+          <code style="word-break:break-all; display:block; margin-bottom:0.5rem;">{{ request.scheme }}://{{ request.get_host }}/api/v1/device/</code>
+          <div class="mb-2">Token: <code>{{ device.webhook_token }}</code></div>
+          <div class="mb-1">Header: <code>Authorization: Bearer {{ device.webhook_token }}</code></div>
+          <div class="text-secondary mb-3">
+            Full hub: staff download/upload, punch upload, command polling.
+            From this screen you can Pull staff, Push staff, and Pull punches.
+          </div>
+
+          {% if device.brand == "zkteco" and device.ip_address %}
+          <div class="fw-semibold mb-1">ZKTeco LAN (direct control from software):</div>
           <ul class="mb-2 ps-3">
             <li>IP Address: <code>{{ device.ip_address }}</code></li>
             <li>TCP COMM. Port: <code>{{ device.port }}</code></li>
             <li>Comm key: <code>{{ device.comm_key }}</code></li>
-            <li>DHCP: Off (static IP)</li>
           </ul>
-          <div class="text-secondary">Ensure this server can reach <code>{{ device.ip_address }}:{{ device.port }}</code> on the LAN. Enrol staff User IDs on the device to match each employee’s biometric ID in HRMS.</div>
-          {% else %}
-          <div class="fw-semibold mb-1">Push-mode webhook URL (configure on the device):</div>
+          {% endif %}
+
+          {% if device.brand == "hikvision" %}
+          <div class="fw-semibold mb-1">Legacy HikVision webhook:</div>
           <code style="word-break:break-all;">{{ request.scheme }}://{{ request.get_host }}/api/biometric/webhook/?token={{ device.webhook_token }}</code>
-          <div class="text-secondary mt-2">On HikVision: Configuration → Network → Advanced Settings → HTTP Listening (or event-linkage notify) and paste this URL.</div>
           {% endif %}
         </div>
       </div>

@@ -7,7 +7,7 @@ leave management and payroll.
 
 from pathlib import Path
 import os
-from datetime import timedelta
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -19,17 +19,47 @@ try:
 except ImportError:
     pass
 
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_list(name: str, default: str = "") -> list[str]:
+    raw = os.environ.get(name, default)
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
 # ---------------------------------------------------------------------------
 # Core / security
 # ---------------------------------------------------------------------------
-SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY",
-    "django-insecure-CHANGE-THIS-KEY-IN-PRODUCTION-xk29s8df72hsdq",
-)
+_INSECURE_SECRET_FALLBACK = "django-insecure-CHANGE-THIS-KEY-IN-PRODUCTION-xk29s8df72hsdq"
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", _INSECURE_SECRET_FALLBACK)
 
-DEBUG = os.environ.get("DJANGO_DEBUG", "True") == "True"
+DEBUG = _env_bool("DJANGO_DEBUG", default=True)
 
-ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+ALLOWED_HOSTS = _env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+
+CSRF_TRUSTED_ORIGINS = _env_list("DJANGO_CSRF_TRUSTED_ORIGINS", "")
+
+if not DEBUG:
+    if not SECRET_KEY or SECRET_KEY == _INSECURE_SECRET_FALLBACK or SECRET_KEY.startswith("django-insecure"):
+        raise ImproperlyConfigured(
+            "DJANGO_SECRET_KEY must be set to a strong random value when DJANGO_DEBUG=False."
+        )
+    if not ALLOWED_HOSTS or ALLOWED_HOSTS == ["*"]:
+        raise ImproperlyConfigured(
+            "DJANGO_ALLOWED_HOSTS must list your production domain(s) when DJANGO_DEBUG=False."
+        )
+    if os.environ.get("DJANGO_DB_ENGINE", "postgres") == "sqlite":
+        raise ImproperlyConfigured(
+            "SQLite is not supported for production. Set DJANGO_DB_ENGINE=postgres."
+        )
+
+# HSTS preload is opt-in (irreversible once submitted). Enable via env when ready.
+SILENCED_SYSTEM_CHECKS = ["security.W021"]
 
 # ---------------------------------------------------------------------------
 # Applications
@@ -80,6 +110,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "apps.core.middleware.LoginRequiredMiddleware",
+    "apps.core.middleware.ForcePasswordChangeMiddleware",
     "apps.core.middleware.AuditLogMiddleware",
 ]
 
@@ -128,7 +159,10 @@ else:
             "PASSWORD": os.environ.get("DB_PASSWORD", "hrms_password"),
             "HOST": os.environ.get("DB_HOST", "localhost"),
             "PORT": os.environ.get("DB_PORT", "5432"),
-            "CONN_MAX_AGE": 60,
+            "CONN_MAX_AGE": int(os.environ.get("DB_CONN_MAX_AGE", "60")),
+            "OPTIONS": {
+                "connect_timeout": int(os.environ.get("DB_CONNECT_TIMEOUT", "10")),
+            },
         }
     }
 
@@ -157,8 +191,16 @@ PUBLIC_URLS = [
     "/accounts/password-reset/done/",
     "/accounts/reset/",
     "/api/biometric/webhook/",
+    "/api/v1/biometric/",
+    "/api/v1/device/",
     "/admin/login/",
     "/recruitment/careers/",
+    "/healthz/",
+]
+
+# Still require login even if nested under a PUBLIC_URLS prefix
+PROTECTED_URL_PREFIXES = [
+    "/api/v1/device/manage/",
 ]
 
 # ---------------------------------------------------------------------------
@@ -172,7 +214,7 @@ USE_TZ = True
 # ---------------------------------------------------------------------------
 # Static / media
 # ---------------------------------------------------------------------------
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
@@ -196,7 +238,17 @@ STORAGES = {
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# Allow serving uploaded media from Django when not using nginx (e.g. small VPS).
+# Prefer nginx / object storage in real production; see deploy/nginx.conf.
+SERVE_MEDIA = _env_bool("DJANGO_SERVE_MEDIA", default=DEBUG)
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Large video course uploads stream to disk above FILE_UPLOAD_MAX_MEMORY_SIZE.
+# DATA_UPLOAD_MAX_MEMORY_SIZE must cover the whole multipart body (default raised for L&D videos).
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("FILE_UPLOAD_MAX_MEMORY_SIZE", 10 * 1024 * 1024))
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("DATA_UPLOAD_MAX_MEMORY_SIZE", 512 * 1024 * 1024))
+DATA_UPLOAD_MAX_NUMBER_FIELDS = int(os.environ.get("DATA_UPLOAD_MAX_NUMBER_FIELDS", 2000))
 
 # ---------------------------------------------------------------------------
 # Crispy forms
@@ -208,33 +260,51 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 # Sessions / security hardening
 # ---------------------------------------------------------------------------
 # Idle timeout: logged-in users are signed out after this many seconds without
-# browser activity (mouse/keyboard/touch/scroll). Also applied server-side via
-# SESSION_COOKIE_AGE + SESSION_SAVE_EVERY_REQUEST so idle tabs expire even if
-# JavaScript is disabled.
-IDLE_SESSION_TIMEOUT_SECONDS = int(os.environ.get("IDLE_SESSION_TIMEOUT_SECONDS", 120))
+# browser activity. SESSION_SAVE_EVERY_REQUEST refreshes the expiry on each
+# request so active users are not logged out mid-session.
+IDLE_SESSION_TIMEOUT_SECONDS = int(os.environ.get("IDLE_SESSION_TIMEOUT_SECONDS", 1800))
 SESSION_COOKIE_AGE = IDLE_SESSION_TIMEOUT_SECONDS
 SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
-CSRF_COOKIE_HTTPONLY = False
-SECURE_BROWSER_XSS_FILTER = True
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_HTTPONLY = False  # JS (AJAX forms) needs to read the CSRF cookie
+CSRF_COOKIE_SAMESITE = "Lax"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
 
+# Trust X-Forwarded-Proto / Host when behind nginx or a load balancer.
+if _env_bool("DJANGO_BEHIND_PROXY", default=not DEBUG):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    USE_X_FORWARDED_HOST = True
+
 if not DEBUG:
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_SSL_REDIRECT = False  # set True behind HTTPS-terminating proxy
+    # Secure cookies / HSTS only when HTTPS is actually terminated in front of the app.
+    # For plain-HTTP staging (Docker on :80), set DJANGO_SECURE_SSL_REDIRECT=False.
+    SECURE_SSL_REDIRECT = _env_bool("DJANGO_SECURE_SSL_REDIRECT", default=True)
+    _secure_cookies = _env_bool("DJANGO_SECURE_COOKIES", default=SECURE_SSL_REDIRECT)
+    SESSION_COOKIE_SECURE = _secure_cookies
+    CSRF_COOKIE_SECURE = _secure_cookies
+    SECURE_REDIRECT_EXEMPT = [r"^healthz/?$"]
+    if SECURE_SSL_REDIRECT:
+        SECURE_HSTS_SECONDS = int(os.environ.get("DJANGO_SECURE_HSTS_SECONDS", "31536000"))
+        SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool(
+            "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", default=True
+        )
+        SECURE_HSTS_PRELOAD = _env_bool("DJANGO_SECURE_HSTS_PRELOAD", default=False)
+
 
 # ---------------------------------------------------------------------------
 # HRMS / Biometric device settings
 # ---------------------------------------------------------------------------
-# Primary site device (from Ethernet screen): ZKTeco at 192.168.1.201,
-# TCP COMM. Port 4370, DHCP Off. HikVision ISAPI (HTTP :80) remains supported
-# when brand=hikvision.
 BIOMETRIC_SETTINGS = {
     "PULL_POLL_INTERVAL_SECONDS": int(os.environ.get("BIOMETRIC_POLL_INTERVAL", 60)),
     "WEBHOOK_SHARED_SECRET": os.environ.get("BIOMETRIC_WEBHOOK_SECRET", "change-me-webhook-secret"),
     "ISAPI_TIMEOUT_SECONDS": 8,
     "ZK_TIMEOUT_SECONDS": int(os.environ.get("ZK_TIMEOUT_SECONDS", 10)),
+    # Skip ICMP ping before TCP connect (ping is often blocked; TCP 4370 may still work)
+    "ZK_OMIT_PING": os.environ.get("ZK_OMIT_PING", "True").strip().lower() in {"1", "true", "yes", "on"},
     "ZK_DEFAULT_IP": os.environ.get("ZK_DEFAULT_IP", "192.168.1.201"),
     "ZK_DEFAULT_PORT": int(os.environ.get("ZK_DEFAULT_PORT", 4370)),
     "LATE_GRACE_MINUTES": 10,
@@ -247,44 +317,114 @@ COMPANY_NAME = os.environ.get("COMPANY_NAME", "Northbridge Industries")
 COMPANY_CURRENCY = os.environ.get("COMPANY_CURRENCY", "NGN")
 COMPANY_CURRENCY_SYMBOL = os.environ.get("COMPANY_CURRENCY_SYMBOL", "₦")
 
-# Email backend for password reset
-# In DEBUG, use the mailbox backend so reset links are written to disk and
-# shown on the "email sent" page for local testing.
+# ---------------------------------------------------------------------------
+# Email
+# ---------------------------------------------------------------------------
+# DEBUG: mailbox backend writes messages to disk for local testing.
+# Production: configure SMTP via EMAIL_* env vars (recommended).
 _DEFAULT_EMAIL_BACKEND = (
     "apps.core.mail.DevMailboxEmailBackend"
     if DEBUG
-    else "django.core.mail.backends.console.EmailBackend"
+    else "django.core.mail.backends.smtp.EmailBackend"
 )
 EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", _DEFAULT_EMAIL_BACKEND)
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@hrms.local")
+SERVER_EMAIL = os.environ.get("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
 EMAIL_SUBJECT_PREFIX = os.environ.get("EMAIL_SUBJECT_PREFIX", "[HRMS] ")
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = _env_bool("EMAIL_USE_TLS", default=True)
+EMAIL_USE_SSL = _env_bool("EMAIL_USE_SSL", default=False)
+EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "20"))
+
+ADMINS = [
+    tuple(item.split(":", 1))
+    for item in _env_list("DJANGO_ADMINS")
+    if ":" in item
+]
+MANAGERS = ADMINS
+
 SMS_API_URL = os.environ.get("SMS_API_URL", "")
 WHATSAPP_API_URL = os.environ.get("WHATSAPP_API_URL", "")
 
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
+LOG_LEVEL = os.environ.get("DJANGO_LOG_LEVEL", "INFO" if not DEBUG else "DEBUG")
+LOG_DIR = BASE_DIR / "logs"
+os.makedirs(LOG_DIR, exist_ok=True)
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "verbose": {"format": "[{asctime}] {levelname} {name}: {message}", "style": "{"},
-    },
-    "handlers": {
-        "console": {"class": "logging.StreamHandler", "formatter": "verbose"},
-        "file": {
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": BASE_DIR / "logs" / "hrms.log",
-            "maxBytes": 5 * 1024 * 1024,
-            "backupCount": 5,
-            "formatter": "verbose",
+        "verbose": {
+            "format": "[{asctime}] {levelname} {name} {process:d} {thread:d}: {message}",
+            "style": "{",
+        },
+        "simple": {
+            "format": "[{asctime}] {levelname} {name}: {message}",
+            "style": "{",
         },
     },
-    "root": {"handlers": ["console"], "level": "INFO"},
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
+        "file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOG_DIR / "hrms.log",
+            "maxBytes": 10 * 1024 * 1024,
+            "backupCount": 10,
+            "formatter": "verbose",
+        },
+        "error_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOG_DIR / "errors.log",
+            "maxBytes": 10 * 1024 * 1024,
+            "backupCount": 10,
+            "formatter": "verbose",
+            "level": "ERROR",
+        },
+    },
+    "root": {
+        "handlers": ["console", "file", "error_file"],
+        "level": LOG_LEVEL,
+    },
     "loggers": {
-        "apps.attendance.biometrics": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
-        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+        "django": {
+            "handlers": ["console", "file"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console", "file", "error_file"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "django.security": {
+            "handlers": ["console", "file", "error_file"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "apps.attendance.biometrics": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "gunicorn.error": {
+            "handlers": ["console", "file", "error_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "gunicorn.access": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
 
-os.makedirs(BASE_DIR / "logs", exist_ok=True)

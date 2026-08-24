@@ -3,7 +3,10 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+from apps.core.views import healthz
+
 urlpatterns = [
+    path("healthz/", healthz, name="healthz"),
     path("admin/", admin.site.urls),
     path("accounts/", include("apps.accounts.urls")),
     path("", include("apps.dashboard.urls")),
@@ -28,6 +31,8 @@ urlpatterns = [
     path("api/", include("apps.attendance.api_urls")),
 ]
 
-if settings.DEBUG:
+if settings.DEBUG or getattr(settings, "SERVE_MEDIA", False):
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATICFILES_DIRS[0])

@@ -1,0 +1,17 @@
+{% comment %}Shared Learning & Development sub-nav{% endcomment %}
+<ul class="nav nav-pills flex-wrap gap-1 mb-4" style="font-size:0.82rem;">
+  <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'overview' %}active{% endif %}" href="{% url 'training:dashboard' %}">Dashboard</a></li>
+  <li class="nav-item"><a class="nav-link {% if 'catalogue' in request.resolver_match.url_name or 'course' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'training:catalogue' %}">Catalogue</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'programs' %}active{% endif %}" href="{% url 'training:programs' %}">Programs</a></li>
+  <li class="nav-item"><a class="nav-link {% if 'session' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'training:sessions' %}">Sessions</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'my_learning' or request.resolver_match.url_name == 'request_training' or request.resolver_match.url_name == 'watch_course' %}active{% endif %}" href="{% url 'training:my_learning' %}">My Learning</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'approvals' %}active{% endif %}" href="{% url 'training:approvals' %}">Approvals</a></li>
+  <li class="nav-item"><a class="nav-link {% if 'competenc' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'training:competencies' %}">Competencies</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'needs' %}active{% endif %}" href="{% url 'training:needs' %}">Needs</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'certificates' %}active{% endif %}" href="{% url 'training:certificates' %}">Certificates</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'calendar' %}active{% endif %}" href="{% url 'training:calendar' %}">Calendar</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}" href="{% url 'training:reports' %}">Reports</a></li>
+  {% if can_manage or 'manage_training' in perms_set %}
+  <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'providers' %}active{% endif %}" href="{% url 'training:providers' %}">Providers</a></li>
+  {% endif %}
+</ul>

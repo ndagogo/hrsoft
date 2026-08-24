@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Request Training{% endblock %}
+{% block page_title %}Request Training{% endblock %}
+{% block content %}
+{% include "training/_ld_nav.html" %}
+<div class="surface-card" style="max-width:720px;"><div class="surface-card-body">
+<form method="post" enctype="multipart/form-data">{% csrf_token %}
+  {% for field in form %}<div class="mb-3"><label class="form-label fw-semibold">{{ field.label }}</label>{{ field }}{% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}</div>{% endfor %}
+  <button class="btn btn-amber">Submit Request</button>
+  <a href="{% url 'training:my_learning' %}" class="btn btn-light">Cancel</a>
+</form>
+</div></div>
+{% endblock %}

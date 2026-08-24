@@ -73,8 +73,9 @@
     </form>
     <div class="text-center mt-3"><a href="{% url 'accounts:password_reset' %}" class="small text-secondary">Forgot password?</a></div>
 
+    {% if debug %}
     <div class="surface-card mt-4 p-3" style="background:var(--ink-50); border:1px dashed var(--border-soft);">
-      <div class="fw-semibold mb-2" style="font-size:0.8rem;"><i class="bi bi-info-circle me-1"></i>Demo accounts</div>
+      <div class="fw-semibold mb-2" style="font-size:0.8rem;"><i class="bi bi-info-circle me-1"></i>Demo accounts (local only)</div>
       <div style="font-size:0.78rem; color:var(--text-secondary); line-height:1.6;">
         admin / Demo@1234 — Administrator<br>
         hr.manager / Demo@1234 — HR Manager<br>
@@ -83,6 +84,7 @@
         employee1 / Demo@1234 — Employee
       </div>
     </div>
+    {% endif %}
   </div>
 </div>
 

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ session }}{% endblock %}
+{% block page_title %}{{ session.title|default:session.course.title }}{% endblock %}
+{% block page_subtitle %}{{ session.start_date }} – {{ session.end_date }} · {{ session.location|default:"TBA" }}{% endblock %}
+{% block content %}
+{% include "training/_ld_nav.html" %}
+<div class="row g-3 mb-3">
+  <div class="col-md-3"><div class="surface-card surface-card-body"><div class="text-secondary small">Capacity</div><div class="fw-semibold fs-4">{{ session.enrolled_count }}/{{ session.max_participants }}</div></div></div>
+  <div class="col-md-3"><div class="surface-card surface-card-body"><div class="text-secondary small">Available</div><div class="fw-semibold fs-4">{{ session.available_seats }}</div></div></div>
+  <div class="col-md-3"><div class="surface-card surface-card-body"><div class="text-secondary small">Waitlist</div><div class="fw-semibold fs-4">{{ session.waitlisted_count }}</div></div></div>
+  <div class="col-md-3"><div class="surface-card surface-card-body"><div class="text-secondary small">Instructor</div><div class="fw-semibold">{{ session.instructor|default:session.trainer|default:"—" }}</div></div></div>
+</div>
+{% if can_manage and enroll_form %}
+<div class="surface-card mb-3"><div class="surface-card-body">
+  <form method="post" action="{% url 'training:enroll' %}" class="row g-2 align-items-end">
+    {% csrf_token %}
+    <div class="col-md-5"><label class="form-label">Employee</label>{{ enroll_form.employee }}</div>
+    <div class="col-md-5"><label class="form-label">Session</label>{{ enroll_form.schedule }}</div>
+    <div class="col-md-2"><button class="btn btn-amber w-100">Enroll</button></div>
+  </form>
+</div></div>
+{% endif %}
+<div class="surface-card">
+  <div class="surface-card-header"><h3 class="surface-card-title mb-0">Enrolments</h3></div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Employee</th><th>Status</th><th>Score</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for e in enrollments %}
+        <tr>
+          <td>{{ e.employee.user.get_full_name }} <span class="text-secondary small">{{ e.employee.employee_id }}</span></td>
+          <td>{{ e.get_status_display }}{% if e.waitlist_position %} (#{{ e.waitlist_position }}){% endif %}</td>
+          <td>{{ e.evaluation_score|default:"—" }}</td>
+          <td class="text-nowrap">
+            {% if can_manage %}
+            <a class="btn btn-sm btn-light" href="{% url 'training:mark_attendance' e.pk %}">Attendance</a>
+            <a class="btn btn-sm btn-light" href="{% url 'training:record_assessment' e.pk %}">Assess</a>
+            <form class="d-inline" method="post" action="{% url 'training:complete_enrollment' e.pk %}">{% csrf_token %}<button class="btn btn-sm btn-ink">Complete</button></form>
+            {% endif %}
+            <a class="btn btn-sm btn-light" href="{% url 'training:evaluate' e.pk %}">Evaluate</a>
+          </td>
+        </tr>
+      {% empty %}<tr><td colspan="4" class="text-secondary">No enrolments yet.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

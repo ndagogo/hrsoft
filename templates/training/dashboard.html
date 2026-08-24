@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Learning & Development{% endblock %}
+{% block page_title %}Learning & Development{% endblock %}
+{% block page_subtitle %}Training catalogue, competencies, compliance and workforce development{% endblock %}
+
+{% block content %}
+{% include "training/_ld_nav.html" %}
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="surface-card surface-card-body">
+      <div class="text-secondary" style="font-size:0.75rem;">Employees Trained</div>
+      <div class="font-display fw-semibold" style="font-size:1.6rem;">{{ stats.employees_trained }}</div>
+      <div class="text-secondary" style="font-size:0.75rem;">of {{ stats.total_employees }} total staff</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="surface-card surface-card-body">
+      <div class="text-secondary" style="font-size:0.75rem;">Active Courses</div>
+      <div class="font-display fw-semibold" style="font-size:1.6rem;">{{ stats.active_courses }}</div>
+      <div class="text-secondary" style="font-size:0.75rem;">{{ stats.upcoming_sessions }} upcoming sessions</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="surface-card surface-card-body">
+      <div class="text-secondary" style="font-size:0.75rem;">Mandatory Overdue</div>
+      <div class="font-display fw-semibold text-danger" style="font-size:1.6rem;">{{ stats.mandatory_overdue }}</div>
+      <div class="text-secondary" style="font-size:0.75rem;">{{ stats.certs_expiring }} certs expiring (30d)</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="surface-card surface-card-body">
+      <div class="text-secondary" style="font-size:0.75rem;">Training Cost YTD</div>
+      <div class="font-display fw-semibold" style="font-size:1.6rem;">{{ COMPANY_CURRENCY_SYMBOL }}{{ stats.cost_ytd|floatformat:0 }}</div>
+      <div class="text-secondary" style="font-size:0.75rem;">{{ stats.completion_rate }}% completion · {{ stats.open_needs }} open needs</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title mb-0">Upcoming sessions</h3></div>
+      <div class="surface-card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hrms mb-0">
+            <thead><tr><th>Session</th><th>Dates</th><th>Seats</th></tr></thead>
+            <tbody>
+            {% for s in upcoming %}
+              <tr>
+                <td><a href="{% url 'training:session_detail' s.pk %}">{{ s.title|default:s.course.title }}</a></td>
+                <td>{{ s.start_date|date:"M d" }} – {{ s.end_date|date:"M d" }}</td>
+                <td>{{ s.available_seats }}/{{ s.max_participants }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="3" class="text-secondary">No upcoming sessions.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title mb-0">Open competency gaps</h3></div>
+      <div class="surface-card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hrms mb-0">
+            <thead><tr><th>Employee</th><th>Competency</th><th>Gap</th><th>Recommended</th></tr></thead>
+            <tbody>
+            {% for n in open_needs %}
+              <tr>
+                <td>{{ n.employee.user.get_full_name }}</td>
+                <td>{{ n.competency }}</td>
+                <td><span class="badge text-bg-warning">{{ n.gap }}</span></td>
+                <td>{{ n.recommended_course|default:"—" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4" class="text-secondary">No open needs. Run gap scan from Needs.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    {% if my_assignments %}
+    <div class="surface-card mb-3">
+      <div class="surface-card-header d-flex justify-content-between">
+        <h3 class="surface-card-title mb-0">My assignments</h3>
+        <a href="{% url 'training:my_learning' %}" class="small">View all</a>
+      </div>
+      <div class="surface-card-body">
+        {% for a in my_assignments %}
+          <div class="d-flex justify-content-between py-2 border-bottom">
+            <div>
+              <div class="fw-semibold">{{ a.course.title }}</div>
+              <div class="text-secondary" style="font-size:0.78rem;">Due {{ a.due_date|date:"M d, Y"|default:"—" }} · {{ a.get_status_display }}</div>
+            </div>
+            {% if a.is_mandatory %}<span class="status-pill status-late">Mandatory</span>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title mb-0">Mandatory overdue</h3></div>
+      <div class="surface-card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hrms mb-0">
+            <thead><tr><th>Employee</th><th>Course</th><th>Due</th></tr></thead>
+            <tbody>
+            {% for a in overdue %}
+              <tr>
+                <td>{{ a.employee.user.get_full_name }}</td>
+                <td>{{ a.course.title }}</td>
+                <td class="text-danger">{{ a.due_date|date:"M d" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="3" class="text-secondary">None overdue.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title mb-0">Certificates expiring</h3></div>
+      <div class="surface-card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hrms mb-0">
+            <thead><tr><th>Employee</th><th>Course</th><th>Expires</th></tr></thead>
+            <tbody>
+            {% for c in expiring %}
+              <tr>
+                <td>{{ c.enrollment.employee.user.get_full_name }}</td>
+                <td>{{ c.enrollment.schedule.course.title }}</td>
+                <td>{{ c.expiry_date|date:"M d, Y" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="3" class="text-secondary">None in the next 30 days.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

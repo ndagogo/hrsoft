@@ -1,0 +1,57 @@
+# Example HTTPS nginx config for a VPS / bare-metal deploy.
+# Copy to /etc/nginx/sites-available/hrms and adjust domain + certificate paths.
+# Obtain certs with: certbot --nginx -d hrms.example.com
+
+upstream hrms_app {
+    server 127.0.0.1:8000;
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    server_name hrms.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name hrms.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/hrms.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/hrms.example.com/privkey.pem;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:10m;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    client_max_body_size 25m;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy same-origin always;
+
+    location /static/ {
+        alias /var/www/hrms/staticfiles/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    location /media/ {
+        alias /var/www/hrms/media/;
+        expires 7d;
+        add_header Cache-Control "private";
+        access_log off;
+    }
+
+    location / {
+        proxy_pass http://hrms_app;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 60s;
+    }
+}

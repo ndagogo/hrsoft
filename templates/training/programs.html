@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Programs{% endblock %}
+{% block page_title %}Training Programs{% endblock %}
+{% block page_subtitle %}Curricula bundling multiple courses{% endblock %}
+{% block content %}
+{% include "training/_ld_nav.html" %}
+{% if can_manage and form %}
+<div class="surface-card mb-3"><div class="surface-card-body">
+  <form method="post" action="{% url 'training:program_create' %}" class="row g-2 align-items-end">{% csrf_token %}
+    <div class="col-md-2"><label class="form-label">Code</label>{{ form.code }}</div>
+    <div class="col-md-3"><label class="form-label">Title</label>{{ form.title }}</div>
+    <div class="col-md-5"><label class="form-label">Description</label>{{ form.description }}</div>
+    <div class="col-md-2"><button class="btn btn-amber w-100">Add program</button></div>
+  </form>
+</div></div>
+{% endif %}
+{% for p in programs %}
+<div class="surface-card mb-3">
+  <div class="surface-card-header d-flex justify-content-between"><h3 class="surface-card-title mb-0">{{ p.title }}</h3><code>{{ p.code }}</code></div>
+  <div class="surface-card-body">
+    <p class="text-secondary">{{ p.description|default:"" }}</p>
+    <ol class="mb-3">
+      {% for pc in p.program_courses.all %}
+        <li>{{ pc.sequence }}. {{ pc.course.title }}{% if pc.is_required %} <span class="badge text-bg-light">Required</span>{% endif %}</li>
+      {% empty %}<li class="text-secondary">No courses linked.</li>{% endfor %}
+    </ol>
+    {% if can_manage %}
+    <form method="post" action="{% url 'training:program_add_course' p.pk %}" class="d-flex gap-2">{% csrf_token %}
+      <select name="course" class="form-select" style="max-width:360px;" required>
+        <option value="">Add course…</option>
+        {% for c in all_courses %}<option value="{{ c.pk }}">{{ c.code }} — {{ c.title }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-ink">Add</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% empty %}<div class="empty-state"><i class="bi bi-collection"></i>No programs yet.</div>{% endfor %}
+{% endblock %}

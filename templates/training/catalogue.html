@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Training Catalogue{% endblock %}
+{% block page_title %}Training Catalogue{% endblock %}
+{% block page_subtitle %}Organisation learning library{% endblock %}
+{% block content %}
+{% include "training/_ld_nav.html" %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <form class="d-flex gap-2" method="get">
+    <input class="form-control" name="q" value="{{ q }}" placeholder="Search courses…">
+    <select name="category" class="form-select" onchange="this.form.submit()">
+      <option value="">All categories</option>
+      {% for c in categories %}<option value="{{ c.pk }}" {% if request.GET.category == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-ink">Search</button>
+  </form>
+  {% if can_manage %}
+  <div class="d-flex gap-2">
+    <a href="{% url 'training:category_create' %}" class="btn btn-light">Category</a>
+    <a href="{% url 'training:course_create' %}" class="btn btn-amber"><i class="bi bi-plus-lg me-1"></i>New Course</a>
+  </div>
+  {% endif %}
+</div>
+<div class="row g-3">
+{% for course in courses %}
+  <div class="col-md-6 col-xl-4">
+    <div class="surface-card surface-card-body h-100">
+      <div class="d-flex justify-content-between mb-2 gap-2 flex-wrap">
+        <code style="font-size:0.75rem;">{{ course.code }}</code>
+        <div class="d-flex gap-1">
+          {% if course.video_lesson_count %}<span class="status-pill status-present"><i class="bi bi-camera-video me-1"></i>Video</span>{% endif %}
+          {% if course.is_mandatory %}<span class="status-pill status-late">Mandatory</span>{% endif %}
+        </div>
+      </div>
+      <h5 class="font-display fw-semibold"><a href="{% url 'training:course_detail' course.pk %}" class="text-decoration-none">{{ course.title }}</a></h5>
+      <div class="text-secondary mb-2" style="font-size:0.8rem;">{{ course.get_delivery_method_display }} · {{ course.duration_hours }}h · {{ course.get_difficulty_display }}{% if course.video_lesson_count %} · {{ course.video_lesson_count }} lesson{{ course.video_lesson_count|pluralize }}{% endif %}</div>
+      <p class="mb-2" style="font-size:0.85rem;">{{ course.description|truncatewords:28|default:"No description." }}</p>
+      <div class="d-flex justify-content-between align-items-center gap-2">
+        <span class="fw-semibold">{{ COMPANY_CURRENCY_SYMBOL }}{{ course.budget_cost|floatformat:0 }}</span>
+        {% if course.video_lesson_count %}
+        <a href="{% url 'training:watch_course' course.pk %}" class="btn btn-sm btn-ink">Watch</a>
+        {% else %}
+        <span class="text-secondary" style="font-size:0.78rem;">{{ course.category|default:"Uncategorised" }}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% empty %}
+  <div class="col-12"><div class="empty-state"><i class="bi bi-journal-bookmark"></i>No courses yet.</div></div>
+{% endfor %}
+</div>
+{% endblock %}

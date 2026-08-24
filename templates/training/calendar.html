@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Training Calendar{% endblock %}
+{% block page_title %}Training Calendar{% endblock %}
+{% block content %}
+{% include "training/_ld_nav.html" %}
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="surface-card surface-card-body">
+      <div id="trainingCalendar"></div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title mb-0">Sessions</h3></div>
+      <div class="surface-card-body">
+        {% for s in sessions %}
+          <a href="{% url 'training:session_detail' s.pk %}" class="d-block py-2 border-bottom text-decoration-none">
+            <div class="fw-semibold">{{ s.title|default:s.course.title }}</div>
+            <div class="small text-secondary">{{ s.start_date|date:"M d, Y" }} · {{ s.location|default:"TBA" }}</div>
+          </a>
+        {% empty %}<div class="text-secondary">No sessions.</div>{% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const el = document.getElementById('trainingCalendar');
+  if (!el || typeof FullCalendar === 'undefined') return;
+  const calendar = new FullCalendar.Calendar(el, {
+    initialView: 'dayGridMonth',
+    height: 560,
+    events: {{ events_json|safe }}
+  });
+  calendar.render();
+});
+</script>
+{% endblock %}

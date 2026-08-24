@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}{{ course.title }}{% endblock %}
+{% block page_title %}{{ course.title }}{% endblock %}
+{% block page_subtitle %}{{ course.code }} · {{ course.get_training_type_display }}{% endblock %}
+{% block content %}
+{% include "training/_ld_nav.html" %}
+<div class="d-flex flex-wrap gap-2 mb-3">
+  {% if can_manage %}<a href="{% url 'training:course_edit' course.pk %}" class="btn btn-amber btn-sm">Edit</a>{% endif %}
+  {% if course.has_video_lessons %}
+  <a href="{% url 'training:watch_course' course.pk %}" class="btn btn-ink btn-sm"><i class="bi bi-play-circle me-1"></i>Watch course</a>
+  {% endif %}
+  <a href="{% url 'training:session_create' %}" class="btn btn-light btn-sm">Schedule session</a>
+</div>
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="surface-card surface-card-body mb-3">
+      <p>{{ course.description|linebreaksbr|default:"No description." }}</p>
+      <div class="row g-2" style="font-size:0.85rem;">
+        <div class="col-6"><span class="text-secondary">Delivery</span><div class="fw-semibold">{{ course.get_delivery_method_display }}</div></div>
+        <div class="col-6"><span class="text-secondary">Duration</span><div class="fw-semibold">{{ course.duration_hours }} hours</div></div>
+        <div class="col-6"><span class="text-secondary">Cost</span><div class="fw-semibold">{{ course.currency }} {{ course.budget_cost }}</div></div>
+        <div class="col-6"><span class="text-secondary">Pass mark</span><div class="fw-semibold">{{ course.pass_mark }}%</div></div>
+        <div class="col-6"><span class="text-secondary">Mandatory</span><div class="fw-semibold">{% if course.is_mandatory %}Yes{% else %}No{% endif %}</div></div>
+        <div class="col-6"><span class="text-secondary">Video lessons</span><div class="fw-semibold">{{ course.published_lesson_count }}</div></div>
+      </div>
+      {% if video_summary and video_summary.total %}
+      <div class="mt-3">
+        <div class="d-flex justify-content-between small text-secondary mb-1">
+          <span>Your progress</span><span>{{ video_summary.completed }}/{{ video_summary.total }} ({{ video_summary.percent }}%)</span>
+        </div>
+        <div class="progress" style="height:8px;"><div class="progress-bar bg-warning" style="width: {{ video_summary.percent }}%"></div></div>
+      </div>
+      {% endif %}
+      {% if course.prerequisites %}<hr><div class="text-secondary small">Prerequisites</div><div>{{ course.prerequisites|linebreaksbr }}</div>{% endif %}
+      {% if course.target_audience %}<div class="text-secondary small mt-2">Target audience</div><div>{{ course.target_audience|linebreaksbr }}</div>{% endif %}
+    </div>
+
+    <div class="surface-card mb-3">
+      <div class="surface-card-header d-flex justify-content-between align-items-center">
+        <h3 class="surface-card-title mb-0">Video lessons</h3>
+        {% if course.has_video_lessons %}
+        <a href="{% url 'training:watch_course' course.pk %}" class="btn btn-sm btn-amber">Watch</a>
+        {% endif %}
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>#</th><th>Lesson</th><th>Duration</th><th>Status</th>{% if can_manage %}<th></th>{% endif %}</tr></thead>
+          <tbody>
+          {% for lesson in lessons %}
+            <tr>
+              <td>{{ lesson.sort_order }}</td>
+              <td>
+                <div class="fw-semibold">{{ lesson.title }}</div>
+                <div class="small text-secondary">
+                  {% if lesson.video %}Uploaded file{% elif lesson.external_url %}External link{% else %}No media{% endif %}
+                  {% if not lesson.is_published %} · Draft{% endif %}
+                </div>
+              </td>
+              <td>{{ lesson.duration_label|default:"—" }}</td>
+              <td>{% if lesson.is_published %}<span class="status-pill status-present">Published</span>{% else %}<span class="status-pill">Draft</span>{% endif %}</td>
+              {% if can_manage %}
+              <td>
+                <form method="post" action="{% url 'training:lesson_delete' course.pk lesson.pk %}" onsubmit="return confirm('Delete this lesson?');">
+                  {% csrf_token %}
+                  <button class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+          {% empty %}
+            <tr><td colspan="{% if can_manage %}5{% else %}4{% endif %}" class="text-secondary">No video lessons yet.{% if can_manage %} Upload one below.{% endif %}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if can_manage and lesson_form %}
+      <div class="surface-card-body border-top">
+        <h4 class="h6 mb-3">Upload video lesson</h4>
+        <form method="post" action="{% url 'training:lesson_create' course.pk %}" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">{{ lesson_form.title.label }}</label>
+              {{ lesson_form.title }}
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">{{ lesson_form.sort_order.label }}</label>
+              {{ lesson_form.sort_order }}
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+              <div class="form-check mb-2">
+                {{ lesson_form.is_published }}
+                <label class="form-check-label" for="{{ lesson_form.is_published.id_for_label }}">Published</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">{{ lesson_form.description.label }}</label>
+              {{ lesson_form.description }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Video file</label>
+              {{ lesson_form.video }}
+              <div class="form-text">MP4 / WebM / MOV, up to 500&nbsp;MB</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Or external URL</label>
+              {{ lesson_form.external_url }}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Duration (seconds)</label>
+              {{ lesson_form.duration_seconds }}
+              <div class="form-text">Optional — filled automatically when staff watch</div>
+            </div>
+          </div>
+          <div class="mt-3">
+            <button class="btn btn-amber">Upload lesson</button>
+          </div>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title mb-0">Sessions</h3></div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Dates</th><th>Location</th><th>Capacity</th><th></th></tr></thead>
+          <tbody>
+          {% for s in sessions %}
+            <tr>
+              <td>{{ s.start_date }} – {{ s.end_date }}</td>
+              <td>{{ s.location|default:"—" }}</td>
+              <td>{{ s.enrolled_count }}/{{ s.max_participants }}</td>
+              <td><a href="{% url 'training:session_detail' s.pk %}">Open</a></td>
+            </tr>
+          {% empty %}<tr><td colspan="4" class="text-secondary">No classroom/virtual sessions scheduled.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title mb-0">Competencies developed</h3></div>
+      <div class="surface-card-body">
+        {% for link in competencies %}
+          <div class="d-flex justify-content-between py-2 border-bottom">
+            <span>{{ link.competency.name }}</span>
+            <span class="badge text-bg-light">Level {{ link.develops_to_level }}</span>
+          </div>
+        {% empty %}<div class="text-secondary">None linked yet.</div>{% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -7,6 +7,10 @@ LoginRequiredMiddleware
     files free of repetitive @login_required decorators while making the
     "secure by default" posture explicit and auditable in one place.
 
+ForcePasswordChangeMiddleware
+    Redirects users flagged with must_change_password to the change-password
+    screen before they can use the rest of the app (e.g. after import/reset).
+
 AuditLogMiddleware
     Writes a lightweight audit trail row for state-changing requests
     (POST/PUT/PATCH/DELETE) so admins can see who-did-what-when across the
@@ -14,6 +18,8 @@ AuditLogMiddleware
 """
 from django.conf import settings
 from django.contrib.auth.views import redirect_to_login
+from django.shortcuts import redirect
+from django.urls import reverse
 from django.utils.deprecation import MiddlewareMixin
 
 
@@ -24,6 +30,18 @@ class LoginRequiredMiddleware(MiddlewareMixin):
         if path.startswith(settings.STATIC_URL) or path.startswith(settings.MEDIA_URL):
             return None
 
+        # Device Hub manage endpoints stay session-protected even though they
+        # live under the public /api/v1/device/ prefix used by terminals.
+        protected_prefixes = getattr(
+            settings,
+            "PROTECTED_URL_PREFIXES",
+            ["/api/v1/device/manage/"],
+        )
+        if any(path.startswith(p) for p in protected_prefixes):
+            if request.user.is_authenticated:
+                return None
+            return redirect_to_login(request.get_full_path(), settings.LOGIN_URL)
+
         if any(path.startswith(p) for p in settings.PUBLIC_URLS):
             return None
 
@@ -31,6 +49,27 @@ class LoginRequiredMiddleware(MiddlewareMixin):
             return None
 
         return redirect_to_login(request.get_full_path(), settings.LOGIN_URL)
+
+
+class ForcePasswordChangeMiddleware(MiddlewareMixin):
+    ALLOWED_PREFIXES = (
+        "/accounts/change-password/",
+        "/accounts/logout/",
+        "/static/",
+        "/media/",
+        "/healthz/",
+    )
+
+    def process_request(self, request):
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return None
+        if not getattr(user, "must_change_password", False):
+            return None
+        path = request.path
+        if any(path.startswith(prefix) for prefix in self.ALLOWED_PREFIXES):
+            return None
+        return redirect(reverse("accounts:change_password"))
 
 
 class AuditLogMiddleware(MiddlewareMixin):

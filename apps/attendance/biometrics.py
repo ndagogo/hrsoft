@@ -45,14 +45,47 @@ logger = logging.getLogger("apps.attendance.biometrics")
 # Shared normalisation / ingestion
 # ---------------------------------------------------------------------------
 
-def ingest_event(*, device, device_employee_no, timestamp, direction="unknown", source="face", raw_payload=None):
+def ingest_event(
+    *,
+    device,
+    device_employee_no,
+    timestamp,
+    direction="unknown",
+    source="face",
+    raw_payload=None,
+    event_id="",
+):
     """
-    Normalise one punch event (from either pull or push) into a
+    Normalise one punch event (from pull, push webhook, or remote API) into a
     RawPunchLog row, try to match it to an Employee, and roll the day's
-    attendance up. Returns the created RawPunchLog.
+    attendance up.
+
+    Returns (RawPunchLog, created: bool). When event_id is provided and a row
+    already exists for (device, event_id), the existing row is returned and
+    created=False (idempotent ingest).
     """
     from apps.employees.models import Employee
     from .models import RawPunchLog
+
+    event_id = (event_id or "").strip()
+    if event_id and device is not None:
+        existing = RawPunchLog.objects.filter(device=device, event_id=event_id).first()
+        if existing:
+            return existing, False
+
+    # Soft dedupe for devices that retry without an event_id.
+    if device is not None and not event_id:
+        window_start = timestamp - timedelta(seconds=2)
+        window_end = timestamp + timedelta(seconds=2)
+        existing = RawPunchLog.objects.filter(
+            device=device,
+            device_employee_no=str(device_employee_no),
+            direction=direction,
+            timestamp__gte=window_start,
+            timestamp__lte=window_end,
+        ).first()
+        if existing:
+            return existing, False
 
     employee = Employee.objects.filter(biometric_id=str(device_employee_no)).select_related("user").first()
 
@@ -63,6 +96,7 @@ def ingest_event(*, device, device_employee_no, timestamp, direction="unknown", 
         direction=direction,
         source=source,
         timestamp=timestamp,
+        event_id=event_id,
         raw_payload=raw_payload or {},
         matched=employee is not None,
     )
@@ -75,7 +109,119 @@ def ingest_event(*, device, device_employee_no, timestamp, direction="unknown", 
             device_employee_no, device, timestamp,
         )
 
-    return log
+    if device is not None:
+        BiometricDevice = device.__class__
+        BiometricDevice.objects.filter(pk=device.pk).update(last_seen_at=timezone.now())
+
+    return log, True
+
+
+def normalize_direction(value) -> str:
+    text = (value or "unknown").strip().lower()
+    mapping = {
+        "in": "in",
+        "checkin": "in",
+        "check_in": "in",
+        "check-in": "in",
+        "entry": "in",
+        "clockin": "in",
+        "clock_in": "in",
+        "out": "out",
+        "checkout": "out",
+        "check_out": "out",
+        "check-out": "out",
+        "exit": "out",
+        "clockout": "out",
+        "clock_out": "out",
+    }
+    return mapping.get(text, "unknown")
+
+
+def normalize_method(value) -> str:
+    text = (value or "api").strip().lower()
+    mapping = {
+        "face": "face",
+        "facial": "face",
+        "fingerprint": "fingerprint",
+        "finger": "fingerprint",
+        "fp": "fingerprint",
+        "card": "card",
+        "rfid": "card",
+        "password": "password",
+        "pw": "password",
+        "pin": "pin",
+        "qr": "qr",
+        "qrcode": "qr",
+        "manual": "manual",
+        "webhook": "webhook",
+        "api": "api",
+        "other": "api",
+    }
+    return mapping.get(text, "api")
+
+
+def parse_api_timestamp(value):
+    """Accept ISO-8601 timestamps; default to now when missing/invalid."""
+    if value in (None, ""):
+        return timezone.now()
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        try:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            return timezone.now()
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt)
+    return dt
+
+
+def resolve_device_from_token(token: str, *, device_id=None, serial_number=None):
+    """
+    Resolve an active BiometricDevice from its API/webhook token.
+    Optionally constrain by primary key or serial_number.
+    """
+    import secrets
+
+    from .models import BiometricDevice
+
+    token = (token or "").strip()
+    if not token:
+        return None
+
+    qs = BiometricDevice.objects.filter(is_active=True).exclude(webhook_token="")
+    if device_id:
+        qs = qs.filter(pk=device_id)
+    if serial_number:
+        qs = qs.filter(serial_number__iexact=str(serial_number).strip())
+
+    for device in qs.iterator():
+        if secrets.compare_digest(str(device.webhook_token), token):
+            return device
+
+    # Platform-wide fallback secret (legacy) — only when a single active push device exists
+    # or device_id/serial was provided.
+    shared = (settings.BIOMETRIC_SETTINGS.get("WEBHOOK_SHARED_SECRET") or "").strip()
+    if shared and secrets.compare_digest(shared, token):
+        if device_id:
+            return BiometricDevice.objects.filter(pk=device_id, is_active=True).first()
+        if serial_number:
+            return BiometricDevice.objects.filter(
+                serial_number__iexact=str(serial_number).strip(), is_active=True
+            ).first()
+    return None
+
+
+def extract_device_token(request) -> str:
+    auth = request.headers.get("Authorization", "") or ""
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+    return (
+        request.headers.get("X-Device-Token")
+        or request.headers.get("X-Webhook-Token")
+        or request.GET.get("token")
+        or ""
+    ).strip()
 
 
 @transaction.atomic
@@ -188,7 +334,7 @@ def process_webhook_payload(device, payload: dict):
     else:
         source = "face"
 
-    return ingest_event(
+    log, _created = ingest_event(
         device=device,
         device_employee_no=employee_no,
         timestamp=timestamp,
@@ -196,6 +342,7 @@ def process_webhook_payload(device, payload: dict):
         source=source,
         raw_payload=payload,
     )
+    return log
 
 
 def _parse_device_datetime(dt_str):
@@ -210,8 +357,12 @@ def _parse_device_datetime(dt_str):
 
 
 def verify_webhook_token(device, provided_token: str) -> bool:
+    import secrets
+
     expected = device.webhook_token or settings.BIOMETRIC_SETTINGS["WEBHOOK_SHARED_SECRET"]
-    return bool(provided_token) and provided_token == expected
+    if not provided_token or not expected:
+        return False
+    return secrets.compare_digest(str(provided_token), str(expected))
 
 
 # ---------------------------------------------------------------------------
@@ -272,7 +423,7 @@ def _pull_zkteco(device, since):
     events, _info = pull_zk_attendance(device, since=since)
     ingested = 0
     for event in events:
-        ingest_event(
+        _log, created = ingest_event(
             device=device,
             device_employee_no=event["user_id"],
             timestamp=event["timestamp"],
@@ -280,7 +431,8 @@ def _pull_zkteco(device, since):
             source="fingerprint",
             raw_payload=event.get("raw") or {},
         )
-        ingested += 1
+        if created:
+            ingested += 1
     return ingested
 
 
@@ -322,7 +474,7 @@ def _pull_hikvision(device, since, now):
             if not employee_no:
                 continue
             dt = _parse_device_datetime(item.get("time"))
-            ingest_event(
+            _log, created = ingest_event(
                 device=device,
                 device_employee_no=employee_no,
                 timestamp=dt,
@@ -330,7 +482,8 @@ def _pull_hikvision(device, since, now):
                 source="face" if "face" in (item.get("currentVerifyMode") or "").lower() else "fingerprint",
                 raw_payload=item,
             )
-            ingested += 1
+            if created:
+                ingested += 1
 
         num_matches = (data.get("AcsEvent", {}) or {}).get("numOfMatches", 0)
         position += max_results

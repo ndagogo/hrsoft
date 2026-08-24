@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Competencies{% endblock %}
+{% block page_title %}Competencies & Skills{% endblock %}
+{% block content %}
+{% include "training/_ld_nav.html" %}
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title mb-0">Competency library</h3></div>
+      <div class="surface-card-body">
+        {% for c in competencies %}
+          <div class="py-2 border-bottom"><strong>{{ c.name }}</strong><div class="small text-secondary">{{ c.category|default:"General" }} · Max L{{ c.max_level }}</div></div>
+        {% empty %}<div class="text-secondary">None yet.</div>{% endfor %}
+      </div>
+    </div>
+    {% if can_manage and comp_form %}
+    <div class="surface-card"><div class="surface-card-body">
+      <h4 class="h6">Add competency</h4>
+      <form method="post" action="{% url 'training:competency_create' %}">{% csrf_token %}
+        {% for field in comp_form %}<div class="mb-2"><label class="form-label small">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+        <button class="btn btn-amber btn-sm">Save</button>
+      </form>
+    </div></div>
+    {% endif %}
+  </div>
+  <div class="col-lg-4">
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title mb-0">Position requirements</h3></div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0"><thead><tr><th>Position</th><th>Competency</th><th>Lvl</th></tr></thead>
+        <tbody>{% for r in position_reqs %}<tr><td>{{ r.designation }}</td><td>{{ r.competency }}</td><td>{{ r.required_level }}</td></tr>{% empty %}<tr><td colspan="3" class="text-secondary">None.</td></tr>{% endfor %}</tbody></table>
+      </div>
+    </div>
+    {% if can_manage and pos_form %}
+    <div class="surface-card"><div class="surface-card-body">
+      <h4 class="h6">Set position requirement</h4>
+      <form method="post" action="{% url 'training:position_competency_create' %}">{% csrf_token %}
+        {% for field in pos_form %}<div class="mb-2"><label class="form-label small">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+        <button class="btn btn-amber btn-sm">Save</button>
+      </form>
+    </div></div>
+    {% endif %}
+  </div>
+  <div class="col-lg-4">
+    {% if can_manage and emp_form %}
+    <div class="surface-card"><div class="surface-card-body">
+      <h4 class="h6">Assess employee competency</h4>
+      <form method="post" action="{% url 'training:employee_competency_set' %}">{% csrf_token %}
+        {% for field in emp_form %}<div class="mb-2"><label class="form-label small">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+        <button class="btn btn-amber btn-sm">Save & refresh needs</button>
+      </form>
+    </div></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

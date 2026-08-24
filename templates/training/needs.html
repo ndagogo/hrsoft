@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Training Needs{% endblock %}
+{% block page_title %}Training Needs Analysis{% endblock %}
+{% block content %}
+{% include "training/_ld_nav.html" %}
+{% if can_manage %}
+<form method="post" action="{% url 'training:scan_gaps' %}" class="mb-3">{% csrf_token %}
+  <button class="btn btn-amber">Run organisation gap scan</button>
+</form>
+{% endif %}
+<div class="surface-card">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Employee</th><th>Source</th><th>Competency</th><th>Current</th><th>Required</th><th>Gap</th><th>Recommended course</th></tr></thead>
+      <tbody>
+      {% for n in needs %}
+        <tr>
+          <td>{{ n.employee.user.get_full_name }}</td>
+          <td>{{ n.get_source_display }}</td>
+          <td>{{ n.competency|default:"—" }}</td>
+          <td>{{ n.current_level|default:"—" }}</td>
+          <td>{{ n.required_level|default:"—" }}</td>
+          <td><span class="badge text-bg-warning">{{ n.gap }}</span></td>
+          <td>{% if n.recommended_course %}<a href="{% url 'training:course_detail' n.recommended_course_id %}">{{ n.recommended_course }}</a>{% else %}—{% endif %}</td>
+        </tr>
+      {% empty %}<tr><td colspan="7" class="text-secondary">No open needs.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

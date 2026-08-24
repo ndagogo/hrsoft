@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Sessions{% endblock %}
+{% block page_title %}Training Sessions{% endblock %}
+{% block content %}
+{% include "training/_ld_nav.html" %}
+<div class="d-flex justify-content-between mb-3">
+  <a href="?upcoming=1" class="btn btn-light btn-sm">Upcoming only</a>
+  {% if can_manage %}<a href="{% url 'training:session_create' %}" class="btn btn-amber btn-sm">Schedule session</a>{% endif %}
+</div>
+<div class="surface-card">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Course / Session</th><th>Dates</th><th>Location</th><th>Instructor</th><th>Seats</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for s in sessions %}
+        <tr>
+          <td><a href="{% url 'training:session_detail' s.pk %}">{{ s.title|default:s.course.title }}</a><div class="text-secondary small">{{ s.course.code }}</div></td>
+          <td>{{ s.start_date|date:"M d, Y" }}{% if s.end_date != s.start_date %} – {{ s.end_date|date:"M d" }}{% endif %}</td>
+          <td>{{ s.location|default:s.meeting_url|default:"—" }}</td>
+          <td>{{ s.instructor|default:s.trainer|default:"—" }}</td>
+          <td>{{ s.enrolled_count }}/{{ s.max_participants }}{% if s.is_full %} <span class="badge text-bg-secondary">FULL</span>{% endif %}</td>
+          <td>{{ s.get_status_display }}</td>
+        </tr>
+      {% empty %}<tr><td colspan="6" class="text-secondary">No sessions.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

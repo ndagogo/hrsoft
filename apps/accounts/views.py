@@ -36,6 +36,11 @@ class HRMSLoginView(LoginView):
     authentication_form = StyledAuthenticationForm
     redirect_authenticated_user = True
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["debug"] = settings.DEBUG
+        return context
+
     def form_valid(self, form):
         user = form.get_user()
         if user.mfa_enabled:
@@ -89,17 +94,12 @@ class HRMSPasswordResetView(PasswordResetView):
     html_email_template_name = None
 
     def form_valid(self, form):
+        # Generic success copy — do not reveal whether the email exists.
         messages.success(
             self.request,
-            f"Reset instructions have been sent to {form.cleaned_data['email']}.",
+            "If an account exists for that email, password reset instructions have been sent.",
         )
         return super().form_valid(form)
-
-    def form_invalid(self, form):
-        # Surface the "email doesn't exist" message clearly
-        if form.errors.get("email"):
-            messages.error(self.request, form.errors["email"][0])
-        return super().form_invalid(form)
 
 
 class HRMSPasswordResetDoneView(PasswordResetDoneView):

@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Watch · {{ course.title }}{% endblock %}
+{% block page_title %}{{ course.title }}{% endblock %}
+{% block page_subtitle %}Self-paced video learning · {{ summary.completed }}/{{ summary.total }} lessons complete ({{ summary.percent }}%){% endblock %}
+{% block content %}
+{% include "training/_ld_nav.html" %}
+{% csrf_token %}
+<div class="mb-3 d-flex flex-wrap gap-2">
+  <a href="{% url 'training:my_learning' %}" class="btn btn-light btn-sm">My Learning</a>
+  <a href="{% url 'training:course_detail' course.pk %}" class="btn btn-light btn-sm">Course details</a>
+</div>
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="surface-card overflow-hidden mb-3">
+      <div class="bg-dark ratio ratio-16x9">
+        {% if current.video %}
+        <video id="lesson-player" class="w-100 h-100" controls playsinline
+               controlsList="nodownload"
+               src="{{ current.video.url }}"
+               data-progress-url="{% url 'training:lesson_progress' course.pk current.pk %}"
+               data-resume="{{ current_watched_seconds }}"></video>
+        {% elif current.external_url %}
+        <div class="d-flex flex-column align-items-center justify-content-center text-white p-4 h-100">
+          <p class="mb-3">This lesson uses an external video link.</p>
+          <a class="btn btn-amber" href="{{ current.external_url }}" target="_blank" rel="noopener">Open video</a>
+          <button type="button" class="btn btn-outline-light btn-sm mt-3" id="mark-external-complete"
+                  data-progress-url="{% url 'training:lesson_progress' course.pk current.pk %}">
+            Mark as watched
+          </button>
+        </div>
+        {% else %}
+        <div class="d-flex align-items-center justify-content-center text-white">No video source for this lesson.</div>
+        {% endif %}
+      </div>
+      <div class="surface-card-body">
+        <h2 class="h5 mb-1">{{ current.title }}</h2>
+        {% if current.description %}<p class="text-secondary mb-0 small">{{ current.description|linebreaksbr }}</p>{% endif %}
+        <div class="progress mt-3" style="height:8px;" role="progressbar" aria-valuenow="{{ summary.percent }}" aria-valuemin="0" aria-valuemax="100">
+          <div class="progress-bar bg-warning" id="course-progress-bar" style="width: {{ summary.percent }}%"></div>
+        </div>
+        <div class="small text-secondary mt-1">Course progress: <span id="course-progress-label">{{ summary.percent }}%</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title mb-0">Lessons</h3></div>
+      <div class="list-group list-group-flush">
+        {% for row in summary.lessons %}
+        <a href="{% url 'training:watch_course' course.pk %}?lesson={{ row.lesson.pk }}"
+           class="list-group-item list-group-item-action d-flex justify-content-between align-items-start {% if row.lesson.pk == current.pk %}active{% endif %}">
+          <div>
+            <div class="fw-semibold">{{ forloop.counter }}. {{ row.lesson.title }}</div>
+            <div class="small {% if row.lesson.pk == current.pk %}text-white-50{% else %}text-secondary{% endif %}">
+              {% if row.lesson.duration_label %}{{ row.lesson.duration_label }} · {% endif %}{{ row.percent }}% watched
+            </div>
+          </div>
+          {% if row.completed %}<i class="bi bi-check-circle-fill {% if row.lesson.pk == current.pk %}text-white{% else %}text-success{% endif %}"></i>{% endif %}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  const csrfInput = document.querySelector("input[name=csrfmiddlewaretoken]");
+  const csrftoken = csrfInput ? csrfInput.value : "";
+
+  function postProgress(url, payload) {
+    if (!url) return;
+    fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrftoken,
+      },
+      body: JSON.stringify(payload),
+      credentials: "same-origin",
+    }).then(function (r) { return r.json(); }).then(function (data) {
+      if (!data.ok) return;
+      const bar = document.getElementById("course-progress-bar");
+      const label = document.getElementById("course-progress-label");
+      if (bar) bar.style.width = data.course_percent + "%";
+      if (label) label.textContent = data.course_percent + "%";
+    }).catch(function () {});
+  }
+
+  const player = document.getElementById("lesson-player");
+  if (player) {
+    let lastSent = 0;
+    const resume = parseInt(player.dataset.resume || "0", 10) || 0;
+    const url = player.dataset.progressUrl;
+    player.addEventListener("loadedmetadata", function () {
+      try {
+        if (resume > 0 && resume < (player.duration || Infinity) - 2) {
+          player.currentTime = resume;
+        }
+      } catch (e) {}
+    });
+    player.addEventListener("timeupdate", function () {
+      const now = Math.floor(player.currentTime || 0);
+      if (now - lastSent < 8) return;
+      lastSent = now;
+      postProgress(url, {
+        watched_seconds: now,
+        duration_seconds: Math.floor(player.duration || 0) || null,
+        completed: false,
+      });
+    });
+    player.addEventListener("ended", function () {
+      postProgress(url, {
+        watched_seconds: Math.floor(player.duration || player.currentTime || 0),
+        duration_seconds: Math.floor(player.duration || 0) || null,
+        completed: true,
+      });
+    });
+  }
+
+  const markBtn = document.getElementById("mark-external-complete");
+  if (markBtn) {
+    markBtn.addEventListener("click", function () {
+      postProgress(markBtn.dataset.progressUrl, { watched_seconds: 1, completed: true });
+      markBtn.textContent = "Marked as watched";
+      markBtn.disabled = true;
+    });
+  }
+})();
+</script>
+{% endblock %}

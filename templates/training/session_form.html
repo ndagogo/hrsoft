@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block content %}
+{% include "training/_ld_nav.html" %}
+<div class="surface-card" style="max-width:820px;"><div class="surface-card-body">
+<form method="post">{% csrf_token %}
+  <div class="row g-3">{% for field in form %}<div class="col-md-6"><label class="form-label fw-semibold">{{ field.label }}</label>{{ field }}</div>{% endfor %}</div>
+  <button class="btn btn-amber mt-3">Save session</button>
+</form>
+</div></div>
+{% endblock %}

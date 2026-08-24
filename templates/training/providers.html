@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Providers & Instructors{% endblock %}
+{% block page_title %}Providers & Instructors{% endblock %}
+{% block content %}
+{% include "training/_ld_nav.html" %}
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title mb-0">Providers</h3></div>
+      <div class="surface-card-body">
+        {% for p in providers %}
+          <div class="py-2 border-bottom"><strong>{{ p.name }}</strong><div class="small text-secondary">{{ p.contact_person }} · {{ p.email }} · {{ p.phone }}</div></div>
+        {% empty %}<div class="text-secondary">None yet.</div>{% endfor %}
+      </div>
+    </div>
+    <div class="surface-card"><div class="surface-card-body">
+      <h4 class="h6">Add provider</h4>
+      <form method="post">{% csrf_token %}{% for field in form %}<div class="mb-2"><label class="form-label small">{{ field.label }}</label>{{ field }}</div>{% endfor %}<button class="btn btn-amber btn-sm">Save</button></form>
+    </div></div>
+  </div>
+  <div class="col-lg-6">
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title mb-0">Instructors</h3></div>
+      <div class="surface-card-body">
+        {% for i in instructors %}
+          <div class="py-2 border-bottom"><strong>{{ i.name }}</strong><div class="small text-secondary">{{ i.get_instructor_type_display }} · {{ i.specialization }}</div></div>
+        {% empty %}<div class="text-secondary">None yet.</div>{% endfor %}
+      </div>
+    </div>
+    <div class="surface-card"><div class="surface-card-body">
+      <h4 class="h6">Add instructor</h4>
+      <form method="post" action="{% url 'training:instructor_create' %}">{% csrf_token %}{% for field in instructor_form %}<div class="mb-2"><label class="form-label small">{{ field.label }}</label>{{ field }}</div>{% endfor %}<button class="btn btn-amber btn-sm">Save</button></form>
+    </div></div>
+  </div>
+</div>
+{% endblock %}

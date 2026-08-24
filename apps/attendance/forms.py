@@ -14,25 +14,40 @@ class BiometricDeviceForm(forms.ModelForm):
             "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. Main Gate Terminal"}),
             "brand": forms.Select(attrs={"class": "form-select", "id": "id_brand"}),
             "connection_mode": forms.Select(attrs={"class": "form-select"}),
-            "ip_address": forms.TextInput(attrs={"class": "form-control", "placeholder": "192.168.1.201"}),
+            "ip_address": forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "192.168.1.201 (optional for remote API)",
+            }),
             "port": forms.NumberInput(attrs={"class": "form-control", "placeholder": "4370"}),
             "comm_key": forms.NumberInput(attrs={"class": "form-control", "placeholder": "0"}),
             "username": forms.TextInput(attrs={"class": "form-control"}),
             "password": forms.PasswordInput(attrs={"class": "form-control"}, render_value=True),
             "location": forms.TextInput(attrs={"class": "form-control"}),
             "serial_number": forms.TextInput(attrs={"class": "form-control"}),
-            "webhook_token": forms.TextInput(attrs={"class": "form-control", "placeholder": "Auto-generated if left blank"}),
+            "webhook_token": forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "API Bearer token — auto-generated if blank",
+            }),
             "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["ip_address"].required = False
         if not self.instance.pk and not self.is_bound:
             self.fields["brand"].initial = "zkteco"
             self.fields["port"].initial = 4370
             self.fields["connection_mode"].initial = "pull"
             self.fields["ip_address"].initial = "192.168.1.201"
             self.fields["comm_key"].initial = 0
+
+    def clean(self):
+        cleaned = super().clean()
+        mode = cleaned.get("connection_mode")
+        ip = cleaned.get("ip_address")
+        if mode in ("pull", "both") and not ip:
+            self.add_error("ip_address", "IP address is required for pull / both connection modes.")
+        return cleaned
 
 
 class AttendanceOverrideForm(forms.ModelForm):
