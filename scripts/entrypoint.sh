@@ -8,118 +8,219 @@ import os
 import time
 import sys
 
-engine = os.environ.get("DJANGO_DB_ENGINE", "postgres").strip().lower()
 
-# ---------------------------------------------------------------------------
+# =============================================================================
+# Environment helper
+# =============================================================================
+
+def env_value(name, default=None):
+    """
+    Return an environment variable only if it contains a non-empty value.
+    This prevents values such as DB_PORT="" from breaking the application.
+    """
+    value = os.environ.get(name)
+
+    if value is None:
+        return default
+
+    value = value.strip()
+
+    if not value:
+        return default
+
+    return value
+
+
+# =============================================================================
+# Database engine
+# =============================================================================
+
+engine = env_value("DJANGO_DB_ENGINE", "postgres").lower()
+
+
+# =============================================================================
 # SQLite
-# ---------------------------------------------------------------------------
+# =============================================================================
+
 if engine == "sqlite":
-    print("[entrypoint] SQLite selected. Skipping PostgreSQL readiness check.")
+    print("[entrypoint] SQLite selected.")
+    print("[entrypoint] Skipping PostgreSQL readiness check.")
     sys.exit(0)
 
-# ---------------------------------------------------------------------------
-# PostgreSQL
-# ---------------------------------------------------------------------------
+
+# =============================================================================
+# Validate database engine
+# =============================================================================
+
 if engine != "postgres":
     print(
-        f"[entrypoint] ERROR: Unsupported DJANGO_DB_ENGINE='{engine}'. "
-        "Expected 'postgres' or 'sqlite'.",
+        f"[entrypoint] ERROR: Unsupported DJANGO_DB_ENGINE='{engine}'.",
+        file=sys.stderr,
+    )
+
+    print(
+        "[entrypoint] Expected 'postgres' or 'sqlite'.",
+        file=sys.stderr,
+    )
+
+    sys.exit(1)
+
+
+# =============================================================================
+# PostgreSQL
+# =============================================================================
+
+try:
+    import psycopg2
+except ImportError:
+    print(
+        "[entrypoint] ERROR: psycopg2 is not installed.",
         file=sys.stderr,
     )
     sys.exit(1)
 
-import psycopg2
 
-# ---------------------------------------------------------------------------
-# Prefer DATABASE_URL.
-# Railway PostgreSQL exposes DATABASE_URL automatically.
-# ---------------------------------------------------------------------------
-database_url = os.environ.get("DATABASE_URL", "").strip()
+# =============================================================================
+# PostgreSQL connection
+# =============================================================================
+#
+# Priority:
+#
+# 1. DATABASE_URL
+# 2. DB_* variables
+# 3. Railway PG* variables
+# 4. Safe defaults
+#
+# Empty variables are ignored.
+# =============================================================================
 
-# ---------------------------------------------------------------------------
-# Otherwise use PostgreSQL native variables or existing DB_* variables.
-# This keeps the application compatible with Railway, VPS and Docker Compose.
-# ---------------------------------------------------------------------------
+database_url = env_value("DATABASE_URL")
+
+
 if database_url:
+
     connection_kwargs = {
         "dsn": database_url,
         "connect_timeout": 3,
     }
+
     connection_description = "DATABASE_URL"
 
 else:
-    host = os.environ.get(
+
+    host = env_value(
         "DB_HOST",
-        os.environ.get("PGHOST", "localhost"),
+        env_value("PGHOST", "localhost"),
     )
 
-    port = os.environ.get(
+    port = env_value(
         "DB_PORT",
-        os.environ.get("PGPORT", "5432"),
+        env_value("PGPORT", "5432"),
     )
 
-    name = os.environ.get(
+    name = env_value(
         "DB_NAME",
-        os.environ.get("PGDATABASE", "hrms_db"),
+        env_value("PGDATABASE", "hrms_db"),
     )
 
-    user = os.environ.get(
+    user = env_value(
         "DB_USER",
-        os.environ.get("PGUSER", "hrms_user"),
+        env_value("PGUSER", "hrms_user"),
     )
 
-    password = os.environ.get(
+    password = env_value(
         "DB_PASSWORD",
-        os.environ.get("PGPASSWORD", ""),
+        env_value("PGPASSWORD", ""),
     )
+
+    try:
+        port = int(port)
+    except (TypeError, ValueError):
+        print(
+            f"[entrypoint] ERROR: Invalid PostgreSQL port: '{port}'",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     connection_kwargs = {
         "dbname": name,
         "user": user,
         "password": password,
         "host": host,
-        "port": int(port),
+        "port": port,
         "connect_timeout": 3,
     }
 
     connection_description = f"{host}:{port}/{name}"
 
 
-# ---------------------------------------------------------------------------
-# Wait for database
-# ---------------------------------------------------------------------------
-wait_seconds = int(os.environ.get("DB_WAIT_SECONDS", "120"))
+# =============================================================================
+# Database wait configuration
+# =============================================================================
+
+try:
+    wait_seconds = int(
+        env_value("DB_WAIT_SECONDS", "120")
+    )
+except ValueError:
+    wait_seconds = 120
+
+
 deadline = time.time() + wait_seconds
 last_error = None
+
+
+# =============================================================================
+# Wait for PostgreSQL
+# =============================================================================
 
 print(
     f"[entrypoint] Waiting for PostgreSQL ({connection_description})..."
 )
 
+
 while time.time() < deadline:
+
     try:
-        conn = psycopg2.connect(**connection_kwargs)
+
+        conn = psycopg2.connect(
+            **connection_kwargs
+        )
+
         conn.close()
 
-        print("[entrypoint] Database is ready.")
+        print(
+            "[entrypoint] Database is ready."
+        )
+
         break
 
     except Exception as exc:
+
         last_error = exc
+
         print(
             f"[entrypoint] Database not ready: {exc}",
             file=sys.stderr,
         )
+
         time.sleep(2)
 
 else:
+
     print(
         f"[entrypoint] ERROR: Database was not ready after "
         f"{wait_seconds} seconds.",
         file=sys.stderr,
     )
-    print(f"[entrypoint] Last error: {last_error}", file=sys.stderr)
+
+    print(
+        f"[entrypoint] Last error: {last_error}",
+        file=sys.stderr,
+    )
+
     sys.exit(1)
+
 
 PY
 
@@ -143,7 +244,7 @@ python manage.py collectstatic --noinput
 
 
 # =============================================================================
-# Start application
+# Start Gunicorn
 # =============================================================================
 
 echo "[entrypoint] Starting application: $*"
