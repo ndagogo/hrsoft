@@ -41,7 +41,7 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", _INSECURE_SECRET_FALLBACK)
 
 DEBUG = _env_bool("DJANGO_DEBUG", default=True)
 
-ALLOWED_HOSTS = _env_list("DJANGO_ALLOWED_HOSTS", "https://hfdnhr.auxanosoft.com/")
+ALLOWED_HOSTS = _env_list("DJANGO_ALLOWED_HOSTS", "127.0.0.1")
 
 CSRF_TRUSTED_ORIGINS = _env_list("DJANGO_CSRF_TRUSTED_ORIGINS", "")
 
