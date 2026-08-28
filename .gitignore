@@ -1,17 +1,3 @@
-#__pycache__/
-#*.py[cod]
-*.sqlite3
-#.env
-#/staticfiles/
-#/media/avatars/*
-#!/media/avatars/.gitkeep
-#/logs/*.log
-#.venv/
-#/venv/
-#/egg-info/
-#.DS_Store
-
-
 # ==========================================
 # Python
 # ==========================================
@@ -28,7 +14,7 @@ env/
 ENV/
 
 # ==========================================
-# Django
+# Django / local database
 # ==========================================
 *.sqlite3
 db.sqlite3
