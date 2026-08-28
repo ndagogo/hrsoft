@@ -263,7 +263,7 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 # Idle timeout: logged-in users are signed out after this many seconds without
 # browser activity. SESSION_SAVE_EVERY_REQUEST refreshes the expiry on each
 # request so active users are not logged out mid-session.
-IDLE_SESSION_TIMEOUT_SECONDS = int(os.environ.get("IDLE_SESSION_TIMEOUT_SECONDS", 1800))
+IDLE_SESSION_TIMEOUT_SECONDS = int(os.environ.get("IDLE_SESSION_TIMEOUT_SECONDS", 120))
 SESSION_COOKIE_AGE = IDLE_SESSION_TIMEOUT_SECONDS
 SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
