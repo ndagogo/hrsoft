@@ -1,4 +1,4 @@
-# Northbridge HRMS — Enterprise HR Management System
+# AUXASOFT HRMS — Enterprise HR Management System
 
 A full-featured HR platform built with **Django** (backend) and **Bootstrap 5**
 (frontend), featuring role-based dashboards, biometric attendance integration
