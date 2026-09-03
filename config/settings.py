@@ -237,11 +237,11 @@ STORAGES = {
 }
 
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = Path(os.environ.get("DJANGO_MEDIA_ROOT", str(BASE_DIR / "media")))
 
-# Allow serving uploaded media from Django when not using nginx (e.g. small VPS).
-# Prefer nginx / object storage in real production; see deploy/nginx.conf.
-SERVE_MEDIA = _env_bool("DJANGO_SERVE_MEDIA", default=DEBUG)
+# Gunicorn/Railway have no nginx in front of /media/. Serve uploads from Django
+# unless explicitly disabled (DJANGO_SERVE_MEDIA=False when nginx or S3 handles files).
+SERVE_MEDIA = _env_bool("DJANGO_SERVE_MEDIA", default=True)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

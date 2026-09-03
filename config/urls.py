@@ -31,7 +31,7 @@ urlpatterns = [
     path("api/", include("apps.attendance.api_urls")),
 ]
 
-if settings.DEBUG or getattr(settings, "SERVE_MEDIA", False):
+if settings.DEBUG or getattr(settings, "SERVE_MEDIA", True):
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.DEBUG:
