@@ -93,13 +93,19 @@ Make sure `.env` has `DJANGO_DB_ENGINE=postgres` (the default) with matching
 **Option B — SQLite (fastest way to try it out):**
 Set `DJANGO_DB_ENGINE=sqlite` in `.env`. No further setup needed.
 
-### 4. Migrate, seed demo data, and run
+### 4. Migrate, bootstrap, (optional demo), and run
 
 ```bash
 python manage.py migrate
-python manage.py seed_demo_data          # populates roles, employees, attendance, leave, payroll
-python manage.py createsuperuser         # optional: an additional Django admin account
+python manage.py createsuperuser         # first admin login
+python manage.py bootstrap_system        # permissions, roles, leave types; attaches Admin to superusers
 python manage.py runserver
+```
+
+For a local sandbox with fake employees/attendance (not for production):
+
+```bash
+python manage.py seed_demo_data          # also bootstraps roles; wipes attendance/leave/payroll
 ```
 
 Visit **http://127.0.0.1:8000** and sign in with any of the demo accounts
@@ -299,10 +305,11 @@ Services:
 
 Health check: `http://<host>/healthz/`
 
-Create the first admin user:
+Create the first admin user, then re-run bootstrap so that account gets the Admin role:
 
 ```bash
 docker compose exec web python manage.py createsuperuser
+docker compose exec web python manage.py bootstrap_system
 ```
 
 For HTTPS on a VPS, put TLS in front of nginx (Cloudflare, Caddy, or
@@ -318,6 +325,7 @@ cp .env.example .env   # production values, DJANGO_DB_ENGINE=postgres
 python manage.py migrate
 python manage.py collectstatic --noinput
 python manage.py createsuperuser
+python manage.py bootstrap_system
 python manage.py check --deploy
 ```
 
@@ -340,3 +348,11 @@ python manage.py check --deploy
 - Do not run `python manage.py runserver`
 - Do not run `seed_demo_data` on a live company database
 - Do not commit `.env`, `db.sqlite3`, `media/`, or `logs/`
+
+Production deploys run `migrate` then `bootstrap_system` (see `scripts/entrypoint.sh`).
+`bootstrap_system` is idempotent and does not create demo users or delete
+attendance, leave, or payroll. Optional first-install org skeleton:
+
+```bash
+python manage.py bootstrap_system --with-org --company-name "Health Focus Diagnostics"
+```

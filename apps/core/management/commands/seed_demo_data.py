@@ -21,7 +21,8 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from apps.rbac.models import Permission, Role, PermissionCategory
+from apps.rbac.bootstrap import bootstrap_system
+from apps.rbac.catalog import LEAVE_TYPES
 from apps.accounts.models import User
 from apps.employees.models import Department, Designation, Employee, EmploymentType, EmploymentStatus, Gender
 from apps.attendance.models import BiometricDevice, RawPunchLog, AttendanceRecord, AttendanceStatus, PunchSource
@@ -50,114 +51,6 @@ DEPARTMENTS = [
     ("Customer Support", "SUP", ["Support Agent", "Support Team Lead"]),
 ]
 
-PERMISSIONS = [
-    ("view_employees", "View employees", PermissionCategory.EMPLOYEES, "Browse the employee directory and profiles."),
-    ("manage_employees", "Manage employees", PermissionCategory.EMPLOYEES, "Create, edit and offboard employee records."),
-    ("manage_departments", "Manage departments", PermissionCategory.EMPLOYEES, "Create and edit departments & designations."),
-
-    ("view_attendance", "View attendance", PermissionCategory.ATTENDANCE, "View attendance records across the organisation."),
-    ("manage_attendance", "Manage attendance", PermissionCategory.ATTENDANCE, "Manually override attendance records."),
-    ("manage_devices", "Manage biometric devices", PermissionCategory.ATTENDANCE, "Register and configure HikVision / biometric devices."),
-
-    ("approve_leave", "Approve leave requests", PermissionCategory.LEAVE, "Review and approve/reject leave requests."),
-    ("manage_leave_types", "Manage leave types", PermissionCategory.LEAVE, "Configure the leave categories available to staff."),
-    ("approve_leave_hr", "Approve leave (HR stage)", PermissionCategory.LEAVE, "Approve leave requests at the Human Resources stage."),
-    ("approve_leave_gm", "Approve leave (GM stage)", PermissionCategory.LEAVE, "Final leave approval as General Manager."),
-
-    ("view_payroll", "View payroll", PermissionCategory.PAYROLL, "View payroll periods and payslips."),
-    ("manage_payroll", "Manage payroll", PermissionCategory.PAYROLL, "Run payroll and adjust payslips."),
-
-    ("manage_roles", "Manage roles", PermissionCategory.RBAC, "Create roles and assign permissions to them."),
-
-    ("view_reports", "View reports", PermissionCategory.REPORTS, "Access organisation-wide analytics and reports."),
-
-    ("manage_system_settings", "Manage system settings", PermissionCategory.SYSTEM, "Configure platform-wide settings."),
-
-    ("view_employee_documentation", "View employee documentation", PermissionCategory.DOCUMENTS, "View academic, guarantor and other employment documents on employee profiles."),
-]
-
-# Extended enterprise permissions merged at seed time
-from apps.core.seed_enterprise import EXTRA_PERMISSIONS as _EXTRA_PERMS
-_CATEGORY_MAP = {
-    "employees": PermissionCategory.EMPLOYEES,
-    "attendance": PermissionCategory.ATTENDANCE,
-    "leave": PermissionCategory.LEAVE,
-    "payroll": PermissionCategory.PAYROLL,
-    "rbac": PermissionCategory.RBAC,
-    "reports": PermissionCategory.REPORTS,
-    "system": PermissionCategory.SYSTEM,
-    "recruitment": PermissionCategory.RECRUITMENT,
-    "performance": PermissionCategory.PERFORMANCE,
-    "training": PermissionCategory.TRAINING,
-    "assets": PermissionCategory.ASSETS,
-    "documents": PermissionCategory.DOCUMENTS,
-    "visitors": PermissionCategory.VISITORS,
-    "organization": PermissionCategory.ORGANIZATION,
-    "announcements": PermissionCategory.ANNOUNCEMENTS,
-}
-PERMISSIONS.extend([(c, n, _CATEGORY_MAP[cat], d) for c, n, cat, d in _EXTRA_PERMS])
-
-ROLE_DEFINITIONS = {
-    "Admin": {
-        "description": "Full administrative access across the entire platform.",
-        "dashboard_key": "admin",
-        "color": "#111a2e",
-        "permissions": "__all__",
-    },
-    "HR Manager": {
-        "description": "Manages employee records, leave approvals and HR policy.",
-        "dashboard_key": "hr",
-        "color": "#8b5cf6",
-        "permissions": [
-            "view_employees", "manage_employees", "manage_departments",
-            "view_organization", "manage_organization",
-            "view_attendance", "manage_attendance",
-            "approve_leave", "approve_leave_hr", "manage_leave_types",
-            "view_payroll", "view_reports", "export_reports",
-            "view_recruitment", "manage_recruitment",
-            "view_performance", "view_training", "view_documents", "manage_documents",
-            "view_employee_documentation",
-            "view_visitors", "import_data",
-            "create_announcement", "approve_announcement",
-        ],
-    },
-    "Department Manager": {
-        "description": "Oversees their department's team, attendance and leave approvals.",
-        "dashboard_key": "manager",
-        "color": "#14b8a6",
-        "permissions": ["view_employees", "view_attendance", "approve_leave", "view_reports"],
-    },
-    "General Manager": {
-        "description": "Final operational authority — final leave approvals and executive oversight.",
-        "dashboard_key": "admin",
-        "color": "#0f766e",
-        "permissions": [
-            "view_employees", "view_attendance", "view_payroll", "view_reports", "export_reports",
-            "approve_leave", "approve_leave_gm", "approve_announcement", "create_announcement",
-        ],
-    },
-    "Payroll Officer": {
-        "description": "Processes payroll runs and manages payslip adjustments.",
-        "dashboard_key": "payroll",
-        "color": "#f5a524",
-        "permissions": ["view_employees", "view_attendance", "view_payroll", "manage_payroll", "view_reports"],
-    },
-    "Employee": {
-        "description": "Standard staff access: own attendance, leave and payslips.",
-        "dashboard_key": "employee",
-        "color": "#324269",
-        "permissions": [],
-    },
-}
-
-LEAVE_TYPES = [
-    ("Annual Leave", 21, True, "#0ea5e9"),
-    ("Sick Leave", 10, True, "#f43f5e"),
-    ("Maternity/Paternity Leave", 90, True, "#8b5cf6"),
-    ("Compassionate Leave", 5, True, "#64748b"),
-    ("Unpaid Leave", 0, True, "#94a3b8"),
-]
-
 
 class Command(BaseCommand):
     help = "Populates the database with demo HR data: roles, employees, attendance, leave and payroll."
@@ -172,8 +65,8 @@ class Command(BaseCommand):
         n_employees = options["employees"]
         n_days = options["days"]
 
-        self.stdout.write("Seeding permissions & roles…")
-        roles = self._seed_permissions_and_roles()
+        self.stdout.write("Bootstrapping permissions, roles, and reference data…")
+        roles = bootstrap_system(reset_roles=True)["roles"]
 
         self.stdout.write("Seeding departments & designations…")
         designations = self._seed_departments()
@@ -198,13 +91,9 @@ class Command(BaseCommand):
 
         if options.get("enterprise", True):
             from apps.core.seed_enterprise import (
-                seed_extra_permissions, seed_extra_roles, seed_extra_departments,
+                seed_extra_departments,
                 seed_organization, seed_enterprise_modules,
             )
-            self.stdout.write("Seeding enterprise permissions & roles…")
-            perm_objs = {p.codename: p for p in Permission.objects.all()}
-            perm_objs = seed_extra_permissions(perm_objs)
-            roles = seed_extra_roles(roles, perm_objs)
 
             self.stdout.write("Seeding additional departments…")
             designations = seed_extra_departments(designations)
@@ -231,32 +120,6 @@ class Command(BaseCommand):
         ))
 
     # ------------------------------------------------------------------
-    def _seed_permissions_and_roles(self):
-        perm_objs = {}
-        for codename, name, category, desc in PERMISSIONS:
-            perm, _ = Permission.objects.update_or_create(
-                codename=codename, defaults={"name": name, "category": category, "description": desc}
-            )
-            perm_objs[codename] = perm
-
-        roles = {}
-        for role_name, cfg in ROLE_DEFINITIONS.items():
-            role, _ = Role.objects.update_or_create(
-                name=role_name,
-                defaults={
-                    "description": cfg["description"],
-                    "dashboard_key": cfg["dashboard_key"],
-                    "color": cfg["color"],
-                    "is_system_role": True,
-                },
-            )
-            if cfg["permissions"] == "__all__":
-                role.permissions.set(perm_objs.values())
-            else:
-                role.permissions.set([perm_objs[c] for c in cfg["permissions"]])
-            roles[role_name] = role
-        return roles
-
     def _seed_departments(self):
         designations = {}
         for name, code, titles in DEPARTMENTS:

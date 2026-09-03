@@ -19,77 +19,9 @@ from apps.notifications.models import Notification, NotificationCategory
 from apps.announcements.models import Announcement, AnnouncementPriority, AnnouncementStatus
 from apps.system_settings.models import SystemSetting, Holiday, SettingCategory
 from apps.employees.models import Department, Employee
+from apps.rbac.catalog import ENTERPRISE_PERMISSIONS as EXTRA_PERMISSIONS
+from apps.rbac.catalog import ENTERPRISE_ROLES as EXTRA_ROLES
 
-
-EXTRA_PERMISSIONS = [
-    ("view_recruitment", "View recruitment", "recruitment", "View vacancies and applications."),
-    ("manage_recruitment", "Manage recruitment", "recruitment", "Create vacancies and manage hiring pipeline."),
-    ("view_performance", "View performance", "performance", "View performance reviews and goals."),
-    ("manage_performance", "Manage performance", "performance", "Create and manage performance reviews."),
-    ("view_training", "View learning & development", "training", "View L&D catalogue, sessions, certificates and reports."),
-    ("manage_training", "Manage learning & development", "training", "Manage courses, sessions, enrolments, competencies and approvals."),
-    ("view_assets", "View assets", "assets", "View company asset inventory."),
-    ("manage_assets", "Manage assets", "assets", "Assign and manage company assets."),
-    ("approve_asset_requests", "Approve asset requests", "assets", "Approve employee asset requests (supervisor/IT/store)."),
-    ("view_documents", "View documents", "documents", "View employee and company documents."),
-    ("manage_documents", "Manage documents", "documents", "Upload and manage documents."),
-    ("view_employee_documentation", "View employee documentation", "documents", "View academic, guarantor and other employment documents on employee profiles."),
-    ("view_visitors", "View visitors", "visitors", "View visitor log and appointments."),
-    ("manage_visitors", "Manage visitors", "visitors", "Register and manage visitors."),
-    ("export_reports", "Export reports", "reports", "Export data to Excel, CSV and PDF."),
-    ("import_data", "Import data", "system", "Bulk import employees, attendance and payroll data."),
-    ("create_announcement", "Create announcements", "announcements", "Create company announcements and submit them for approval."),
-    ("approve_announcement", "Approve announcements", "announcements", "Approve or reject pending company announcements."),
-    ("view_organization", "View organization", "organization", "View companies, regions, branches and units."),
-    ("manage_organization", "Manage organization", "organization", "Create, update and delete companies, regions, branches and units."),
-]
-
-EXTRA_ROLES = {
-    "HR Officer": {
-        "description": "Handles day-to-day HR operations and employee records.",
-        "dashboard_key": "hr",
-        "color": "#6366f1",
-        "permissions": [
-            "view_employees", "manage_employees", "view_attendance", "approve_leave",
-            "approve_leave_hr", "view_assets",
-            "view_recruitment", "view_training", "view_documents", "view_employee_documentation", "view_reports",
-            "create_announcement",
-        ],
-    },
-    "Department Head": {
-        "description": "Leads a department — attendance, leave and team performance.",
-        "dashboard_key": "manager",
-        "color": "#0ea5e9",
-        "permissions": ["view_employees", "view_attendance", "approve_leave", "view_performance", "view_reports"],
-    },
-    "Supervisor": {
-        "description": "Supervises a team subset with leave approval rights.",
-        "dashboard_key": "manager",
-        "color": "#06b6d4",
-        "permissions": ["view_employees", "view_attendance", "approve_leave"],
-    },
-    "Reception": {
-        "description": "Front desk — visitor management and appointments.",
-        "dashboard_key": "employee",
-        "color": "#ec4899",
-        "permissions": ["view_visitors", "manage_visitors", "view_employees"],
-    },
-    "Auditor": {
-        "description": "Read-only access to reports, payroll and audit logs.",
-        "dashboard_key": "admin",
-        "color": "#64748b",
-        "permissions": ["view_employees", "view_attendance", "view_payroll", "view_reports", "export_reports"],
-    },
-    "IT Administrator": {
-        "description": "Manages system settings, devices and integrations.",
-        "dashboard_key": "admin",
-        "color": "#10b981",
-        "permissions": [
-            "manage_devices", "manage_system_settings", "view_employees",
-            "view_assets", "manage_assets", "view_attendance",
-        ],
-    },
-}
 
 EXTRA_DEPARTMENTS = [
     ("Legal", "LEG", ["Legal Officer", "Legal Manager"]),
@@ -110,12 +42,11 @@ EXTRA_DEPARTMENTS = [
 
 
 def seed_extra_permissions(perm_objs):
-    from apps.rbac.models import Permission, PermissionCategory
-    cat_map = {c.value: c for c in PermissionCategory}
+    from apps.rbac.models import Permission
     for codename, name, category, desc in EXTRA_PERMISSIONS:
         perm, _ = Permission.objects.update_or_create(
             codename=codename,
-            defaults={"name": name, "category": cat_map.get(category, category), "description": desc},
+            defaults={"name": name, "category": category, "description": desc},
         )
         perm_objs[codename] = perm
     return perm_objs

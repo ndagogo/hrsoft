@@ -235,6 +235,16 @@ python manage.py migrate --noinput
 
 
 # =============================================================================
+# Application configuration (permissions, roles, leave types, settings)
+# Never runs seed_demo_data — that would wipe operational records.
+# =============================================================================
+
+echo "[entrypoint] Bootstrapping system configuration..."
+
+python manage.py bootstrap_system
+
+
+# =============================================================================
 # Static files
 # =============================================================================
 
