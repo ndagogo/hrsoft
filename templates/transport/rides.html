@@ -9,6 +9,7 @@
   <div class="d-flex gap-2">
     <a href="{% url 'transport:hub' %}" class="btn btn-light btn-sm">Hub</a>
     {% if can_create %}<a href="{% url 'transport:ride_create' %}" class="btn btn-amber btn-sm"><i class="bi bi-plus-lg me-1"></i>Request ride</a>{% endif %}
+    {% if can_manage %}<a href="{% url 'transport:shuttle_create' %}" class="btn btn-light btn-sm"><i class="bi bi-bus-front me-1"></i>New shuttle</a>{% endif %}
   </div>
 </div>
 <div class="surface-card">

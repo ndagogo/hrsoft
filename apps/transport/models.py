@@ -302,6 +302,12 @@ class Ride(models.Model):
     scheduled_return = models.DateTimeField(null=True, blank=True)
     estimated_distance_km = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     estimated_duration_min = models.PositiveIntegerField(null=True, blank=True)
+    route_geometry = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="GeoJSON LineString from the routing provider.",
+    )
+    route_provider = models.CharField(max_length=40, blank=True)
     actual_start_at = models.DateTimeField(null=True, blank=True)
     actual_end_at = models.DateTimeField(null=True, blank=True)
     current_stage = models.CharField(max_length=20, choices=ApprovalStage.choices, blank=True)

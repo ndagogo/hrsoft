@@ -23,6 +23,7 @@ from .models import (
     RidePassenger,
     RideStatus,
     RideStop,
+    RideType,
     StepStatus,
     TransportationPolicy,
     Vehicle,
@@ -143,6 +144,8 @@ def create_ride_request(
     destination_lng=None,
     allow_carpool=True,
     ride_type="official",
+    route_geometry=None,
+    route_provider="",
 ):
     if not vehicle_is_available(vehicle, scheduled_departure, scheduled_return):
         raise ValueError("Vehicle is not available for the selected time window.")
@@ -164,6 +167,8 @@ def create_ride_request(
         scheduled_return=scheduled_return,
         estimated_distance_km=estimated_distance_km,
         estimated_duration_min=estimated_duration_min,
+        route_geometry=route_geometry or {},
+        route_provider=route_provider or "",
         allow_carpool=allow_carpool and policy.allow_carpooling,
     )
     stop = RideStop.objects.create(
@@ -173,21 +178,149 @@ def create_ride_request(
         lat=destination_lat,
         lng=destination_lng,
     )
-    passenger = RidePassenger.objects.create(
-        ride=ride,
-        employee=requester_employee,
-        stop=stop,
-        destination_label=destination_label,
-        destination_lat=destination_lat,
-        destination_lng=destination_lng,
-        status=PassengerStatus.REQUESTED,
-    )
+    passenger = None
+    if requester_employee:
+        passenger = RidePassenger.objects.create(
+            ride=ride,
+            employee=requester_employee,
+            stop=stop,
+            destination_label=destination_label,
+            destination_lat=destination_lat,
+            destination_lng=destination_lng,
+            status=PassengerStatus.REQUESTED,
+        )
     record_event(
         ride, RideEventType.CREATED,
         f"Ride draft created by {organizer.get_full_name() or organizer.username}",
         actor=organizer,
         passenger=passenger,
     )
+    return ride
+
+
+@transaction.atomic
+def create_shuttle_ride(
+    *,
+    organizer,
+    vehicle,
+    origin_label,
+    scheduled_departure,
+    passengers: list[dict],
+    purpose="",
+    driver=None,
+    scheduled_return=None,
+    origin_lat=None,
+    origin_lng=None,
+    allow_carpool=False,
+    estimated_distance_km=None,
+    estimated_duration_min=None,
+    route_geometry=None,
+    route_provider="",
+    submit=True,
+):
+    """
+    Organizer-owned shuttle / multi-passenger journey.
+    passengers: [{employee, destination_label, destination_lat?, destination_lng?}, ...]
+    """
+    if not passengers:
+        raise ValueError("Add at least one passenger.")
+    if vehicle.capacity and len(passengers) > vehicle.capacity:
+        raise ValueError(f"Too many passengers for vehicle capacity ({vehicle.capacity}).")
+    if not vehicle_is_available(vehicle, scheduled_departure, scheduled_return):
+        raise ValueError("Vehicle is not available for the selected time window.")
+
+    # Deduplicate employees
+    seen = set()
+    clean = []
+    for row in passengers:
+        emp = row["employee"]
+        if emp.pk in seen:
+            raise ValueError(f"Duplicate passenger: {emp}")
+        seen.add(emp.pk)
+        clean.append(row)
+
+    policy = TransportationPolicy.current()
+    ride = Ride.objects.create(
+        reference=next_ride_reference(),
+        ride_type=RideType.SHUTTLE,
+        status=RideStatus.DRAFT,
+        organizer=organizer,
+        requester=None,
+        vehicle=vehicle,
+        driver=driver or vehicle.default_drivers.first(),
+        purpose=purpose or "Company shuttle",
+        origin_label=origin_label,
+        origin_lat=origin_lat,
+        origin_lng=origin_lng,
+        scheduled_departure=scheduled_departure,
+        scheduled_return=scheduled_return,
+        estimated_distance_km=estimated_distance_km,
+        estimated_duration_min=estimated_duration_min,
+        route_geometry=route_geometry or {},
+        route_provider=route_provider or "",
+        allow_carpool=allow_carpool and policy.allow_carpooling,
+    )
+
+    # Group passengers by destination label → shared RideStop
+    stop_by_key = {}
+    seq = 0
+    for row in clean:
+        key = (row["destination_label"] or "").strip().lower()
+        if key not in stop_by_key:
+            seq += 1
+            stop_by_key[key] = RideStop.objects.create(
+                ride=ride,
+                sequence=seq,
+                label=row["destination_label"],
+                lat=row.get("destination_lat"),
+                lng=row.get("destination_lng"),
+            )
+        stop = stop_by_key[key]
+        RidePassenger.objects.create(
+            ride=ride,
+            employee=row["employee"],
+            stop=stop,
+            destination_label=row["destination_label"],
+            destination_lat=row.get("destination_lat"),
+            destination_lng=row.get("destination_lng"),
+            status=PassengerStatus.REQUESTED,
+        )
+
+    record_event(
+        ride, RideEventType.CREATED,
+        f"Shuttle created with {len(clean)} passenger(s) by {organizer.get_full_name() or organizer.username}",
+        actor=organizer,
+    )
+    refresh_seats_reserved(ride)
+    if submit:
+        submit_ride(ride, organizer)
+    return ride
+
+
+@transaction.atomic
+def apply_route_estimate(ride: Ride) -> Ride:
+    """Recompute distance/ETA/geometry from origin + ordered stops with coordinates."""
+    from .routing import GeoPoint, estimate_route_or_fallback
+
+    if ride.origin_lat is None or ride.origin_lng is None:
+        return ride
+    points = [
+        GeoPoint(float(ride.origin_lat), float(ride.origin_lng), ride.origin_label),
+    ]
+    for stop in ride.stops.order_by("sequence"):
+        if stop.lat is not None and stop.lng is not None:
+            points.append(GeoPoint(float(stop.lat), float(stop.lng), stop.label))
+    if len(points) < 2:
+        return ride
+    result = estimate_route_or_fallback(points)
+    ride.estimated_distance_km = result.distance_km
+    ride.estimated_duration_min = result.duration_min
+    ride.route_geometry = result.geometry
+    ride.route_provider = result.provider
+    ride.save(update_fields=[
+        "estimated_distance_km", "estimated_duration_min",
+        "route_geometry", "route_provider", "updated_at",
+    ])
     return ride
 
 
@@ -206,6 +339,9 @@ def submit_ride(ride: Ride, actor):
 def initialize_approval_chain(ride: Ride):
     ride.approval_steps.all().delete()
     chain = approval_chain_for_policy()
+    # Shuttle / organizer-created rides without a requester skip manager stage
+    if not ride.requester_id:
+        chain = tuple(s for s in chain if s != ApprovalStage.MANAGER) or (ApprovalStage.TRANSPORT,)
     for i, stage in enumerate(chain, start=1):
         RideApprovalStep.objects.create(
             ride=ride,

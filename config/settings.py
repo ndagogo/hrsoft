@@ -320,6 +320,30 @@ COMPANY_CURRENCY = os.environ.get("COMPANY_CURRENCY", "NGN")
 COMPANY_CURRENCY_SYMBOL = os.environ.get("COMPANY_CURRENCY_SYMBOL", "₦")
 
 # ---------------------------------------------------------------------------
+# Transport maps / routing (Phase 2 — replaceable providers)
+# ---------------------------------------------------------------------------
+TRANSPORT_ROUTING = {
+    "PROVIDER": os.environ.get("TRANSPORT_ROUTING_PROVIDER", "osrm"),
+    "OSRM_URL": os.environ.get("TRANSPORT_OSRM_URL", "https://router.project-osrm.org"),
+    "GEOCODER_URL": os.environ.get(
+        "TRANSPORT_GEOCODER_URL", "https://nominatim.openstreetmap.org/search"
+    ),
+    "REVERSE_GEOCODER_URL": os.environ.get(
+        "TRANSPORT_REVERSE_GEOCODER_URL", "https://nominatim.openstreetmap.org/reverse"
+    ),
+    "COUNTRY_CODES": os.environ.get("TRANSPORT_GEOCODER_COUNTRY", "ng"),
+    "USER_AGENT": os.environ.get(
+        "TRANSPORT_GEOCODER_UA",
+        "HFDN-HRMS-Transport/1.0 (https://hfdnhr.auxanosoft.com)",
+    ),
+    "TIMEOUT_SECONDS": int(os.environ.get("TRANSPORT_ROUTING_TIMEOUT", "15")),
+    # Default map centre (Enugu / SE Nigeria — override per deploy)
+    "DEFAULT_LAT": float(os.environ.get("TRANSPORT_MAP_DEFAULT_LAT", "6.4584")),
+    "DEFAULT_LNG": float(os.environ.get("TRANSPORT_MAP_DEFAULT_LNG", "7.5464")),
+    "DEFAULT_ZOOM": int(os.environ.get("TRANSPORT_MAP_DEFAULT_ZOOM", "12")),
+}
+
+# ---------------------------------------------------------------------------
 # Email
 # ---------------------------------------------------------------------------
 # DEBUG: mailbox backend writes messages to disk for local testing.

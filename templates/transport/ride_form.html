@@ -1,34 +1,93 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Request ride{% endblock %}
 {% block page_title %}Request ride{% endblock %}
-{% block page_subtitle %}Create a transportation journey{% endblock %}
+{% block page_subtitle %}Create a transportation journey with map routing{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  #rideMap { height: 320px; border-radius: 12px; border: 1px solid rgba(0,0,0,.08); }
+  .transport-suggest { font-size: 0.82rem; }
+</style>
+{% endblock %}
 
 {% block content %}
 <a href="{% url 'transport:hub' %}" class="btn btn-light btn-sm mb-3"><i class="bi bi-arrow-left me-1"></i>Back</a>
-<div class="surface-card" style="max-width:720px;">
-  <div class="surface-card-body">
-    <form method="post">
-      {% csrf_token %}
-      <div class="row g-3">
-        <div class="col-md-6"><label class="form-label fw-semibold">Vehicle</label>{{ form.vehicle }}</div>
-        <div class="col-md-6"><label class="form-label fw-semibold">Ride type</label>{{ form.ride_type }}</div>
-        <div class="col-12"><label class="form-label fw-semibold">Origin</label>{{ form.origin_label }}</div>
-        <div class="col-12"><label class="form-label fw-semibold">Your destination</label>{{ form.destination_label }}
-          <div class="form-text">Each passenger can have a different destination on the same ride.</div>
-        </div>
-        <div class="col-md-6"><label class="form-label fw-semibold">Departure</label>{{ form.scheduled_departure }}</div>
-        <div class="col-md-6"><label class="form-label fw-semibold">Expected return (optional)</label>{{ form.scheduled_return }}</div>
-        <div class="col-md-6"><label class="form-label fw-semibold">Driver (optional)</label>{{ form.driver }}</div>
-        <div class="col-md-3"><label class="form-label fw-semibold">Est. km</label>{{ form.estimated_distance_km }}</div>
-        <div class="col-md-3"><label class="form-label fw-semibold">Est. minutes</label>{{ form.estimated_duration_min }}</div>
-        <div class="col-12"><label class="form-label fw-semibold">Purpose</label>{{ form.purpose }}</div>
-        <div class="col-12 form-check ms-1">{{ form.allow_carpool }} <label class="form-check-label">Allow others to request joining this ride (carpool)</label></div>
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="surface-card">
+      <div class="surface-card-body">
+        <form method="post" id="rideRequestForm">
+          {% csrf_token %}
+          {{ form.origin_lat }}{{ form.origin_lng }}{{ form.destination_lat }}{{ form.destination_lng }}
+          {{ form.route_geometry_json }}{{ form.route_provider }}
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label fw-semibold">Vehicle</label>{{ form.vehicle }}</div>
+            <div class="col-md-6"><label class="form-label fw-semibold">Ride type</label>{{ form.ride_type }}</div>
+            <div class="col-12"><label class="form-label fw-semibold">Origin</label>{{ form.origin_label }}
+              <div class="form-text">Start typing — pick a suggestion to pin on the map.</div>
+            </div>
+            <div class="col-12"><label class="form-label fw-semibold">Your destination</label>{{ form.destination_label }}
+              <div class="form-text">Each passenger can have a different destination on the same ride.</div>
+            </div>
+            <div class="col-md-6"><label class="form-label fw-semibold">Departure</label>{{ form.scheduled_departure }}</div>
+            <div class="col-md-6"><label class="form-label fw-semibold">Expected return (optional)</label>{{ form.scheduled_return }}</div>
+            <div class="col-md-6"><label class="form-label fw-semibold">Driver (optional)</label>{{ form.driver }}</div>
+            <div class="col-md-3"><label class="form-label fw-semibold">Est. km</label>{{ form.estimated_distance_km }}</div>
+            <div class="col-md-3"><label class="form-label fw-semibold">Est. minutes</label>{{ form.estimated_duration_min }}</div>
+            <div class="col-12"><label class="form-label fw-semibold">Purpose</label>{{ form.purpose }}</div>
+            <div class="col-12 form-check ms-1">{{ form.allow_carpool }} <label class="form-check-label">Allow others to request joining this ride (carpool)</label></div>
+          </div>
+          <div class="d-flex gap-2 mt-4">
+            <button type="submit" name="submit_now" value="0" class="btn btn-light">Save draft</button>
+            <button type="submit" name="submit_now" value="1" class="btn btn-amber">Submit for approval</button>
+          </div>
+        </form>
       </div>
-      <div class="d-flex gap-2 mt-4">
-        <button type="submit" name="submit_now" value="0" class="btn btn-light">Save draft</button>
-        <button type="submit" name="submit_now" value="1" class="btn btn-amber">Submit for approval</button>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="surface-card">
+      <div class="surface-card-header d-flex justify-content-between align-items-center">
+        <h3 class="surface-card-title mb-0">Route preview</h3>
+        <span class="text-secondary small" id="routeStatus">Pick origin &amp; destination</span>
       </div>
-    </form>
+      <div class="surface-card-body pt-0">
+        <div id="rideMap"></div>
+      </div>
+    </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{% static 'js/transport_map.js' %}"></script>
+<script>
+  window.TRANSPORT_MAP = {
+    geocodeUrl: "{% url 'transport:api_geocode' %}",
+    routeUrl: "{% url 'transport:api_route' %}",
+    defaultLat: {{ map_default_lat }},
+    defaultLng: {{ map_default_lng }},
+    defaultZoom: {{ map_default_zoom }},
+    csrfToken: "{{ csrf_token }}",
+  };
+  document.addEventListener("DOMContentLoaded", function () {
+    TransportMap.initRideMap({
+      mapId: "rideMap",
+      originInput: document.getElementById("id_origin_label"),
+      destInput: document.getElementById("id_destination_label"),
+      originLat: document.getElementById("id_origin_lat"),
+      originLng: document.getElementById("id_origin_lng"),
+      destLat: document.getElementById("id_destination_lat"),
+      destLng: document.getElementById("id_destination_lng"),
+      distanceInput: document.getElementById("id_estimated_distance_km"),
+      durationInput: document.getElementById("id_estimated_duration_min"),
+      geometryInput: document.getElementById("id_route_geometry_json"),
+      providerInput: document.getElementById("id_route_provider"),
+      statusEl: document.getElementById("routeStatus"),
+    });
+  });
+</script>
 {% endblock %}

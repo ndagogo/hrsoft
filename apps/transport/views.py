@@ -1,8 +1,10 @@
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from apps.core.permissions import permission_required, user_has_permission
 
@@ -11,8 +13,10 @@ from .forms import (
     JoinRequestForm,
     ReviewForm,
     RideRequestForm,
+    ShuttleRideForm,
     VehicleDocumentForm,
     VehicleForm,
+    make_shuttle_passenger_formset,
 )
 from .models import (
     Driver,
@@ -24,6 +28,34 @@ from .models import (
     Vehicle,
 )
 from . import services
+from .routing import GeoPoint, estimate_route_or_fallback, geocode
+
+
+def _map_defaults():
+    cfg = getattr(settings, "TRANSPORT_ROUTING", {})
+    return {
+        "map_default_lat": cfg.get("DEFAULT_LAT", 6.4584),
+        "map_default_lng": cfg.get("DEFAULT_LNG", 7.5464),
+        "map_default_zoom": cfg.get("DEFAULT_ZOOM", 12),
+    }
+
+
+def _ride_map_markers(ride):
+    markers = []
+    if ride.origin_lat is not None and ride.origin_lng is not None:
+        markers.append({
+            "lat": float(ride.origin_lat),
+            "lng": float(ride.origin_lng),
+            "label": ride.origin_label or "Origin",
+        })
+    for stop in ride.stops.all():
+        if stop.lat is not None and stop.lng is not None:
+            markers.append({
+                "lat": float(stop.lat),
+                "lng": float(stop.lng),
+                "label": stop.label or "Stop",
+            })
+    return markers
 
 
 def _employee_or_none(user):
@@ -210,12 +242,11 @@ def driver_edit(request, pk):
 
 @login_required
 def ride_list(request):
-    can_manage = user_has_permission(request.user, "manage_transport") or user_has_permission(
-        request.user, "view_transport"
-    )
+    can_manage = user_has_permission(request.user, "manage_transport")
+    can_view_all = can_manage or user_has_permission(request.user, "view_transport")
     emp = _employee_or_none(request.user)
     qs = Ride.objects.select_related("vehicle", "driver__employee__user", "requester__user", "organizer")
-    if can_manage:
+    if can_view_all:
         rides = qs.all()[:100]
     elif emp:
         rides = qs.filter(Q(requester=emp) | Q(passengers__employee=emp) | Q(organizer=request.user)).distinct()[:50]
@@ -257,6 +288,12 @@ def ride_create(request):
                     scheduled_return=form.cleaned_data.get("scheduled_return"),
                     estimated_distance_km=form.cleaned_data.get("estimated_distance_km"),
                     estimated_duration_min=form.cleaned_data.get("estimated_duration_min"),
+                    origin_lat=form.cleaned_data.get("origin_lat"),
+                    origin_lng=form.cleaned_data.get("origin_lng"),
+                    destination_lat=form.cleaned_data.get("destination_lat"),
+                    destination_lng=form.cleaned_data.get("destination_lng"),
+                    route_geometry=form.cleaned_route_geometry(),
+                    route_provider=form.cleaned_data.get("route_provider") or "",
                     allow_carpool=form.cleaned_data.get("allow_carpool", True),
                     ride_type=form.cleaned_data.get("ride_type") or "official",
                 )
@@ -276,7 +313,107 @@ def ride_create(request):
     else:
         form = RideRequestForm()
 
-    return render(request, "transport/ride_form.html", {"form": form})
+    return render(request, "transport/ride_form.html", {"form": form, **_map_defaults()})
+
+
+@login_required
+@permission_required("manage_transport")
+def shuttle_create(request):
+    """Organizer creates a multi-passenger shuttle (no single passenger owns the ride)."""
+    PassengerFormSet = make_shuttle_passenger_formset(extra=3)
+    if request.method == "POST":
+        form = ShuttleRideForm(request.POST)
+        formset = PassengerFormSet(request.POST, prefix="pax")
+        if form.is_valid() and formset.is_valid():
+            passengers = []
+            for row in formset:
+                if not hasattr(row, "cleaned_data") or not row.cleaned_data:
+                    continue
+                if row.cleaned_data.get("DELETE"):
+                    continue
+                emp = row.cleaned_data.get("employee")
+                dest = (row.cleaned_data.get("destination_label") or "").strip()
+                if emp and dest:
+                    passengers.append({
+                        "employee": emp,
+                        "destination_label": dest,
+                        "destination_lat": row.cleaned_data.get("destination_lat"),
+                        "destination_lng": row.cleaned_data.get("destination_lng"),
+                    })
+            try:
+                ride = services.create_shuttle_ride(
+                    organizer=request.user,
+                    vehicle=form.cleaned_data["vehicle"],
+                    origin_label=form.cleaned_data["origin_label"],
+                    scheduled_departure=form.cleaned_data["scheduled_departure"],
+                    passengers=passengers,
+                    purpose=form.cleaned_data.get("purpose") or "Company shuttle",
+                    driver=form.cleaned_data.get("driver"),
+                    scheduled_return=form.cleaned_data.get("scheduled_return"),
+                    origin_lat=form.cleaned_data.get("origin_lat"),
+                    origin_lng=form.cleaned_data.get("origin_lng"),
+                    allow_carpool=form.cleaned_data.get("allow_carpool", False),
+                    estimated_distance_km=form.cleaned_data.get("estimated_distance_km"),
+                    estimated_duration_min=form.cleaned_data.get("estimated_duration_min"),
+                    route_geometry=form.cleaned_route_geometry(),
+                    route_provider=form.cleaned_data.get("route_provider") or "",
+                    submit=request.POST.get("submit_now") == "1",
+                )
+                if request.POST.get("submit_now") == "1":
+                    messages.success(request, f"Shuttle {ride.reference} submitted for transport approval.")
+                else:
+                    messages.success(request, f"Shuttle draft {ride.reference} saved.")
+                return redirect("transport:ride_detail", pk=ride.pk)
+            except ValueError as exc:
+                messages.error(request, str(exc))
+        else:
+            messages.error(request, "Please fix the shuttle form errors.")
+    else:
+        form = ShuttleRideForm()
+        formset = PassengerFormSet(prefix="pax")
+
+    return render(request, "transport/shuttle_form.html", {
+        "form": form,
+        "formset": formset,
+        **_map_defaults(),
+    })
+
+
+@login_required
+@require_GET
+def api_geocode(request):
+    q = (request.GET.get("q") or "").strip()
+    if len(q) < 2:
+        return JsonResponse({"results": []})
+    return JsonResponse({"results": geocode(q, limit=6)})
+
+
+@login_required
+@require_POST
+def api_route(request):
+    """JSON body: {points: [{lat,lng,label?}, ...]} → distance, duration, geometry."""
+    import json
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    raw_points = payload.get("points") or []
+    points = []
+    for p in raw_points:
+        try:
+            points.append(GeoPoint(float(p["lat"]), float(p["lng"]), p.get("label") or ""))
+        except (KeyError, TypeError, ValueError):
+            continue
+    if len(points) < 2:
+        return JsonResponse({"error": "Need at least origin and one stop"}, status=400)
+    result = estimate_route_or_fallback(points)
+    return JsonResponse({
+        "distance_km": str(result.distance_km),
+        "duration_min": result.duration_min,
+        "geometry": result.geometry,
+        "provider": result.provider,
+        "waypoints": result.waypoints,
+    })
 
 
 @login_required
@@ -337,6 +474,9 @@ def ride_detail(request, pk):
             ]
         ),
         "employee": emp,
+        "route_geometry_json": ride.route_geometry or {},
+        "map_markers": _ride_map_markers(ride),
+        **_map_defaults(),
     })
 
 

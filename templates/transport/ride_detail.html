@@ -1,7 +1,15 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}{{ ride.reference }}{% endblock %}
 {% block page_title %}{{ ride.reference }}{% endblock %}
 {% block page_subtitle %}{{ ride.get_status_display }} · {{ ride.get_ride_type_display }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  #rideDetailMap { height: 280px; border-radius: 12px; border: 1px solid rgba(0,0,0,.08); }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between mb-3 flex-wrap gap-2">
@@ -37,9 +45,20 @@
           <div class="col-md-6"><div class="text-secondary small">Driver</div><div>{% if ride.driver %}{{ ride.driver.employee.full_name }}{% else %}—{% endif %}</div></div>
           <div class="col-md-6"><div class="text-secondary small">Seats</div><div>{{ ride.seats_reserved }} reserved · {{ ride.seats_available }} available / {{ ride.capacity }}</div></div>
           <div class="col-md-6"><div class="text-secondary small">Purpose</div><div>{{ ride.purpose|default:"—" }}</div></div>
+          {% if ride.estimated_distance_km or ride.estimated_duration_min %}
+          <div class="col-md-6"><div class="text-secondary small">Distance / ETA</div><div>{% if ride.estimated_distance_km %}{{ ride.estimated_distance_km }} km{% else %}—{% endif %}{% if ride.estimated_duration_min %} · ~{{ ride.estimated_duration_min }} min{% endif %}{% if ride.route_provider %} <span class="text-secondary small">({{ ride.route_provider }})</span>{% endif %}</div></div>
+          {% endif %}
+          {% if not ride.requester %}<div class="col-md-6"><div class="text-secondary small">Organizer</div><div>{{ ride.organizer.get_full_name|default:ride.organizer.username }} <span class="chip">shuttle</span></div></div>{% endif %}
         </div>
       </div>
     </div>
+
+    {% if map_markers or route_geometry_json.coordinates %}
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title">Route map</h3></div>
+      <div class="surface-card-body pt-0"><div id="rideDetailMap"></div></div>
+    </div>
+    {% endif %}
 
     <div class="surface-card mb-3">
       <div class="surface-card-header"><h3 class="surface-card-title">Passengers &amp; destinations</h3></div>
@@ -165,4 +184,25 @@
     </div>
   </div>
 </div>
+{{ route_geometry_json|json_script:"route-geometry-data" }}
+{{ map_markers|json_script:"map-markers-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{% static 'js/transport_map.js' %}"></script>
+<script>
+  window.TRANSPORT_MAP = {
+    defaultLat: {{ map_default_lat }},
+    defaultLng: {{ map_default_lng }},
+    defaultZoom: {{ map_default_zoom }},
+  };
+  document.addEventListener("DOMContentLoaded", function () {
+    const mapEl = document.getElementById("rideDetailMap");
+    if (!mapEl) return;
+    const geometry = JSON.parse(document.getElementById("route-geometry-data").textContent || "{}");
+    const markers = JSON.parse(document.getElementById("map-markers-data").textContent || "[]");
+    TransportMap.initReadOnlyRoute("rideDetailMap", geometry, markers);
+  });
+</script>
 {% endblock %}

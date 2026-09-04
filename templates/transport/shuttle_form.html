@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}New shuttle{% endblock %}
+{% block page_title %}Create shuttle{% endblock %}
+{% block page_subtitle %}Organizer-owned multi-passenger journey — no single passenger owns the ride{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  #shuttleMap { height: 340px; border-radius: 12px; border: 1px solid rgba(0,0,0,.08); }
+  .transport-suggest { font-size: 0.82rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="{% url 'transport:hub' %}" class="btn btn-light btn-sm mb-3"><i class="bi bi-arrow-left me-1"></i>Hub</a>
+
+<form method="post" id="shuttleForm">
+  {% csrf_token %}
+  {{ form.origin_lat }}{{ form.origin_lng }}{{ form.route_geometry_json }}{{ form.route_provider }}
+  {{ formset.management_form }}
+
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="surface-card mb-3">
+        <div class="surface-card-header"><h3 class="surface-card-title">Shuttle details</h3></div>
+        <div class="surface-card-body">
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label fw-semibold">Vehicle</label>{{ form.vehicle }}</div>
+            <div class="col-md-6"><label class="form-label fw-semibold">Driver</label>{{ form.driver }}</div>
+            <div class="col-12"><label class="form-label fw-semibold">Origin</label>{{ form.origin_label }}</div>
+            <div class="col-md-6"><label class="form-label fw-semibold">Departure</label>{{ form.scheduled_departure }}</div>
+            <div class="col-md-6"><label class="form-label fw-semibold">Return (optional)</label>{{ form.scheduled_return }}</div>
+            <div class="col-12"><label class="form-label fw-semibold">Purpose</label>{{ form.purpose }}</div>
+            <div class="col-md-4"><label class="form-label fw-semibold">Est. km</label>{{ form.estimated_distance_km }}</div>
+            <div class="col-md-4"><label class="form-label fw-semibold">Est. minutes</label>{{ form.estimated_duration_min }}</div>
+            <div class="col-md-4 d-flex align-items-end">
+              <div class="form-check mb-2">{{ form.allow_carpool }} <label class="form-check-label">Allow carpool joins</label></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="surface-card mb-3">
+        <div class="surface-card-header d-flex justify-content-between align-items-center">
+          <h3 class="surface-card-title mb-0">Passengers &amp; drop-offs</h3>
+          <button type="button" class="btn btn-sm btn-light" id="addPassengerRow"><i class="bi bi-plus-lg me-1"></i>Add row</button>
+        </div>
+        <div class="surface-card-body" id="passengerRows">
+          {% for pform in formset %}
+          <div class="shuttle-passenger-row border rounded p-3 mb-2">
+            {% for hidden in pform.hidden_fields %}{{ hidden }}{% endfor %}
+            <div class="row g-2 align-items-end">
+              <div class="col-md-5"><label class="form-label small fw-semibold">Employee</label>{{ pform.employee }}</div>
+              <div class="col-md-5"><label class="form-label small fw-semibold">Destination</label>{{ pform.destination_label }}</div>
+              <div class="col-md-2">
+                {% if pform.DELETE %}<div class="form-check"><label class="form-check-label small">{{ pform.DELETE }} Remove</label></div>{% endif %}
+              </div>
+            </div>
+            {{ pform.destination_lat }}{{ pform.destination_lng }}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="px-3 pb-3 text-secondary small">Same destination → shared stop. Different destinations → ordered stops on one vehicle trip.</div>
+      </div>
+
+      <div class="d-flex gap-2 mb-4">
+        <button type="submit" name="submit_now" value="0" class="btn btn-light">Save draft</button>
+        <button type="submit" name="submit_now" value="1" class="btn btn-amber">Submit for approval</button>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="surface-card">
+        <div class="surface-card-header d-flex justify-content-between">
+          <h3 class="surface-card-title mb-0">Route</h3>
+          <span class="text-secondary small" id="shuttleRouteStatus">Set origin + destinations</span>
+        </div>
+        <div class="surface-card-body pt-0"><div id="shuttleMap"></div></div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{% static 'js/transport_map.js' %}"></script>
+<script>
+  window.TRANSPORT_MAP = {
+    geocodeUrl: "{% url 'transport:api_geocode' %}",
+    routeUrl: "{% url 'transport:api_route' %}",
+    defaultLat: {{ map_default_lat }},
+    defaultLng: {{ map_default_lng }},
+    defaultZoom: {{ map_default_zoom }},
+    csrfToken: "{{ csrf_token }}",
+  };
+
+  document.addEventListener("DOMContentLoaded", function () {
+    const totalInput = document.getElementById("id_pax-TOTAL_FORMS");
+    const container = document.getElementById("passengerRows");
+    const addBtn = document.getElementById("addPassengerRow");
+    const emptyRow = container.querySelector(".shuttle-passenger-row");
+
+    addBtn.addEventListener("click", function () {
+      const idx = parseInt(totalInput.value, 10);
+      const html = emptyRow.outerHTML
+        .replace(/pax-0/g, "pax-" + idx)
+        .replace(/pax_0/g, "pax_" + idx);
+      const wrap = document.createElement("div");
+      wrap.innerHTML = html;
+      const row = wrap.firstElementChild;
+      row.querySelectorAll("input, select").forEach((el) => {
+        if (el.type === "checkbox") el.checked = false;
+        else if (el.tagName === "SELECT") el.selectedIndex = 0;
+        else el.value = "";
+      });
+      container.appendChild(row);
+      totalInput.value = idx + 1;
+    });
+
+    TransportMap.initShuttleMap({
+      mapId: "shuttleMap",
+      originInput: document.getElementById("id_shuttle_origin_label"),
+      originLat: document.getElementById("id_shuttle_origin_lat"),
+      originLng: document.getElementById("id_shuttle_origin_lng"),
+      distanceInput: document.getElementById("id_shuttle_distance"),
+      durationInput: document.getElementById("id_shuttle_duration"),
+      geometryInput: document.getElementById("id_shuttle_route_json"),
+      providerInput: document.getElementById("id_shuttle_route_provider"),
+      statusEl: document.getElementById("shuttleRouteStatus"),
+    });
+  });
+</script>
+{% endblock %}

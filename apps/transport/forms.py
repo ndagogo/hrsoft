@@ -81,11 +81,21 @@ class RideRequestForm(forms.Form):
     )
     origin_label = forms.CharField(
         max_length=255,
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. HFDN Head Office"}),
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "e.g. HFDN Head Office",
+            "id": "id_origin_label",
+            "autocomplete": "off",
+        }),
     )
     destination_label = forms.CharField(
         max_length=255,
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. New Haven"}),
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "e.g. New Haven",
+            "id": "id_destination_label",
+            "autocomplete": "off",
+        }),
     )
     scheduled_departure = forms.DateTimeField(
         widget=forms.DateTimeInput(attrs={"class": "form-control", "type": "datetime-local"}),
@@ -117,13 +127,19 @@ class RideRequestForm(forms.Form):
     estimated_distance_km = forms.DecimalField(
         required=False,
         min_value=0,
-        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.1"}),
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.1", "id": "id_estimated_distance_km"}),
     )
     estimated_duration_min = forms.IntegerField(
         required=False,
         min_value=1,
-        widget=forms.NumberInput(attrs={"class": "form-control"}),
+        widget=forms.NumberInput(attrs={"class": "form-control", "id": "id_estimated_duration_min"}),
     )
+    origin_lat = forms.DecimalField(required=False, widget=forms.HiddenInput(attrs={"id": "id_origin_lat"}))
+    origin_lng = forms.DecimalField(required=False, widget=forms.HiddenInput(attrs={"id": "id_origin_lng"}))
+    destination_lat = forms.DecimalField(required=False, widget=forms.HiddenInput(attrs={"id": "id_destination_lat"}))
+    destination_lng = forms.DecimalField(required=False, widget=forms.HiddenInput(attrs={"id": "id_destination_lng"}))
+    route_geometry_json = forms.CharField(required=False, widget=forms.HiddenInput(attrs={"id": "id_route_geometry_json"}))
+    route_provider = forms.CharField(required=False, widget=forms.HiddenInput(attrs={"id": "id_route_provider"}))
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -140,6 +156,122 @@ class RideRequestForm(forms.Form):
         if dt < timezone.now() - timedelta(minutes=5):
             raise forms.ValidationError("Departure time cannot be in the past.")
         return dt
+
+    def cleaned_route_geometry(self):
+        import json
+        raw = self.cleaned_data.get("route_geometry_json") or ""
+        if not raw.strip():
+            return {}
+        try:
+            data = json.loads(raw)
+            return data if isinstance(data, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+
+
+class ShuttleRideForm(forms.Form):
+    vehicle = forms.ModelChoiceField(
+        queryset=Vehicle.objects.none(),
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    origin_label = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={
+            "class": "form-control", "id": "id_shuttle_origin_label", "autocomplete": "off",
+        }),
+    )
+    scheduled_departure = forms.DateTimeField(
+        widget=forms.DateTimeInput(attrs={"class": "form-control", "type": "datetime-local"}),
+    )
+    scheduled_return = forms.DateTimeField(
+        required=False,
+        widget=forms.DateTimeInput(attrs={"class": "form-control", "type": "datetime-local"}),
+    )
+    purpose = forms.CharField(
+        required=False,
+        max_length=255,
+        initial="Company shuttle",
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    driver = forms.ModelChoiceField(
+        queryset=Driver.objects.none(),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    allow_carpool = forms.BooleanField(
+        required=False,
+        initial=False,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+    origin_lat = forms.DecimalField(required=False, widget=forms.HiddenInput(attrs={"id": "id_shuttle_origin_lat"}))
+    origin_lng = forms.DecimalField(required=False, widget=forms.HiddenInput(attrs={"id": "id_shuttle_origin_lng"}))
+    estimated_distance_km = forms.DecimalField(
+        required=False, min_value=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.1", "id": "id_shuttle_distance"}),
+    )
+    estimated_duration_min = forms.IntegerField(
+        required=False, min_value=1,
+        widget=forms.NumberInput(attrs={"class": "form-control", "id": "id_shuttle_duration"}),
+    )
+    route_geometry_json = forms.CharField(required=False, widget=forms.HiddenInput(attrs={"id": "id_shuttle_route_json"}))
+    route_provider = forms.CharField(required=False, widget=forms.HiddenInput(attrs={"id": "id_shuttle_route_provider"}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["vehicle"].queryset = Vehicle.objects.filter(is_active=True).exclude(
+            status=VehicleStatus.RETIRED
+        ).order_by("name")
+        self.fields["driver"].queryset = Driver.objects.filter(status="active").select_related("employee__user")
+        self.fields["driver"].empty_label = "Assign later / default"
+
+    def clean_scheduled_departure(self):
+        dt = self.cleaned_data["scheduled_departure"]
+        if dt < timezone.now() - timedelta(minutes=5):
+            raise forms.ValidationError("Departure time cannot be in the past.")
+        return dt
+
+    def cleaned_route_geometry(self):
+        import json
+        raw = self.cleaned_data.get("route_geometry_json") or ""
+        if not raw.strip():
+            return {}
+        try:
+            data = json.loads(raw)
+            return data if isinstance(data, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+
+
+class ShuttlePassengerForm(forms.Form):
+    employee = forms.ModelChoiceField(
+        queryset=Employee.objects.none(),
+        widget=forms.Select(attrs={"class": "form-select shuttle-employee"}),
+    )
+    destination_label = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={
+            "class": "form-control shuttle-destination", "autocomplete": "off",
+        }),
+    )
+    destination_lat = forms.DecimalField(
+        required=False, widget=forms.HiddenInput(attrs={"class": "shuttle-dest-lat"}),
+    )
+    destination_lng = forms.DecimalField(
+        required=False, widget=forms.HiddenInput(attrs={"class": "shuttle-dest-lng"}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["employee"].queryset = Employee.objects.filter(
+            status="active"
+        ).select_related("user").order_by("user__first_name", "user__last_name")
+        self.fields["employee"].label_from_instance = (
+            lambda obj: f"{obj.full_name} ({obj.employee_id})"
+        )
+
+
+def make_shuttle_passenger_formset(extra=3):
+    return forms.formset_factory(ShuttlePassengerForm, extra=extra, can_delete=True)
 
 
 class JoinRequestForm(forms.Form):

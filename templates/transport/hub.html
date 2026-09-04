@@ -14,6 +14,7 @@
     {% if can_approve %}<a href="{% url 'transport:approvals' %}" class="btn btn-light btn-sm"><i class="bi bi-clipboard-check me-1"></i>Approvals</a>{% endif %}
     {% if can_view %}<a href="{% url 'transport:vehicles' %}" class="btn btn-light btn-sm"><i class="bi bi-truck me-1"></i>Fleet</a>{% endif %}
     {% if can_create %}<a href="{% url 'transport:ride_create' %}" class="btn btn-amber btn-sm"><i class="bi bi-plus-lg me-1"></i>Request ride</a>{% endif %}
+    {% if can_manage %}<a href="{% url 'transport:shuttle_create' %}" class="btn btn-light btn-sm"><i class="bi bi-bus-front me-1"></i>New shuttle</a>{% endif %}
   </div>
 </div>
 
