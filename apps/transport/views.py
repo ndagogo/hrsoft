@@ -1,9 +1,11 @@
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_GET, require_POST
 
 from apps.core.permissions import permission_required, user_has_permission
@@ -23,8 +25,13 @@ from .models import (
     JoinRequest,
     JoinRequestStatus,
     Ride,
+    RideApprovalStep,
+    RideEvent,
+    RideEventType,
     RidePassenger,
     RideStatus,
+    RideType,
+    StepStatus,
     Vehicle,
 )
 from . import services
@@ -84,6 +91,7 @@ def hub(request):
     """Landing: fleet managers see ops; employees see my rides + available carpools."""
     can_manage = user_has_permission(request.user, "manage_transport")
     can_view = can_manage or user_has_permission(request.user, "view_transport")
+    can_history = _can_view_transport_history(request.user)
     emp = _employee_or_none(request.user)
     driver = _driver_or_none(request.user)
 
@@ -120,6 +128,7 @@ def hub(request):
     return render(request, "transport/hub.html", {
         "can_manage": can_manage,
         "can_view": can_view or can_manage,
+        "can_history": can_history,
         "can_create": user_has_permission(request.user, "create_ride") or can_manage,
         "can_approve": user_has_permission(request.user, "approve_transport") or can_manage,
         "is_driver": bool(driver),
@@ -256,6 +265,160 @@ def ride_list(request):
         "rides": rides,
         "can_create": user_has_permission(request.user, "create_ride") or can_manage,
         "can_manage": can_manage,
+    })
+
+
+def _can_view_transport_history(user) -> bool:
+    return (
+        user_has_permission(user, "view_transport")
+        or user_has_permission(user, "manage_transport")
+        or user_has_permission(user, "approve_transport")
+        or getattr(user, "is_superuser", False)
+    )
+
+
+@login_required
+def transport_history(request):
+    """
+    Full transport management history: all ride requests, approval decisions,
+    and operational status events across the module.
+    """
+    if not _can_view_transport_history(request.user):
+        messages.error(request, "You don't have permission to view transport history.")
+        return redirect("transport:hub")
+
+    tab = (request.GET.get("tab") or "requests").strip().lower()
+    if tab not in {"requests", "approvals", "activity"}:
+        tab = "requests"
+
+    q = (request.GET.get("q") or "").strip()
+    status = (request.GET.get("status") or "").strip()
+    ride_type = (request.GET.get("ride_type") or "").strip()
+    event_type = (request.GET.get("event_type") or "").strip()
+    date_from = parse_date(request.GET.get("date_from") or "")
+    date_to = parse_date(request.GET.get("date_to") or "")
+
+    rides_qs = Ride.objects.select_related(
+        "vehicle", "driver__employee__user", "requester__user", "organizer",
+    ).prefetch_related("passengers", "approval_steps")
+
+    if q:
+        rides_qs = rides_qs.filter(
+            Q(reference__icontains=q)
+            | Q(origin_label__icontains=q)
+            | Q(purpose__icontains=q)
+            | Q(vehicle__registration_number__icontains=q)
+            | Q(vehicle__name__icontains=q)
+            | Q(requester__user__first_name__icontains=q)
+            | Q(requester__user__last_name__icontains=q)
+            | Q(organizer__first_name__icontains=q)
+            | Q(organizer__last_name__icontains=q)
+        )
+    if status and status in RideStatus.values:
+        rides_qs = rides_qs.filter(status=status)
+    if ride_type and ride_type in RideType.values:
+        rides_qs = rides_qs.filter(ride_type=ride_type)
+    if date_from:
+        rides_qs = rides_qs.filter(scheduled_departure__date__gte=date_from)
+    if date_to:
+        rides_qs = rides_qs.filter(scheduled_departure__date__lte=date_to)
+
+    events_qs = RideEvent.objects.select_related(
+        "ride", "ride__vehicle", "actor", "passenger__employee__user",
+    ).order_by("-created_at")
+    if q:
+        events_qs = events_qs.filter(
+            Q(ride__reference__icontains=q)
+            | Q(message__icontains=q)
+            | Q(actor__first_name__icontains=q)
+            | Q(actor__last_name__icontains=q)
+            | Q(actor__username__icontains=q)
+        )
+    if status and status in RideStatus.values:
+        events_qs = events_qs.filter(ride__status=status)
+    if ride_type and ride_type in RideType.values:
+        events_qs = events_qs.filter(ride__ride_type=ride_type)
+    if event_type and event_type in RideEventType.values:
+        events_qs = events_qs.filter(event_type=event_type)
+    if date_from:
+        events_qs = events_qs.filter(created_at__date__gte=date_from)
+    if date_to:
+        events_qs = events_qs.filter(created_at__date__lte=date_to)
+
+    approvals_qs = RideApprovalStep.objects.filter(
+        status__in=[StepStatus.APPROVED, StepStatus.REJECTED, StepStatus.PENDING, StepStatus.SKIPPED],
+    ).select_related(
+        "ride", "ride__vehicle", "ride__requester__user", "acted_by",
+    ).order_by("-acted_at", "-id")
+    if q:
+        approvals_qs = approvals_qs.filter(
+            Q(ride__reference__icontains=q)
+            | Q(note__icontains=q)
+            | Q(acted_by__first_name__icontains=q)
+            | Q(acted_by__last_name__icontains=q)
+            | Q(acted_by__username__icontains=q)
+        )
+    if status and status in RideStatus.values:
+        approvals_qs = approvals_qs.filter(ride__status=status)
+    if ride_type and ride_type in RideType.values:
+        approvals_qs = approvals_qs.filter(ride__ride_type=ride_type)
+    if date_from:
+        approvals_qs = approvals_qs.filter(
+            Q(acted_at__date__gte=date_from) | Q(acted_at__isnull=True, ride__created_at__date__gte=date_from)
+        )
+    if date_to:
+        approvals_qs = approvals_qs.filter(
+            Q(acted_at__date__lte=date_to) | Q(acted_at__isnull=True, ride__created_at__date__lte=date_to)
+        )
+
+    if tab == "approvals":
+        page_obj = Paginator(approvals_qs, 25).get_page(request.GET.get("page"))
+    elif tab == "activity":
+        page_obj = Paginator(events_qs, 40).get_page(request.GET.get("page"))
+    else:
+        page_obj = Paginator(rides_qs.order_by("-scheduled_departure", "-created_at"), 25).get_page(
+            request.GET.get("page")
+        )
+
+    status_counts = {
+        row["status"]: row["c"]
+        for row in Ride.objects.values("status").annotate(c=Count("id"))
+    }
+    stats = {
+        "total_rides": Ride.objects.count(),
+        "pending": status_counts.get(RideStatus.PENDING_APPROVAL, 0),
+        "active": Ride.objects.filter(status__in=services.ACTIVE_RIDE_STATUSES).count(),
+        "completed": status_counts.get(RideStatus.COMPLETED, 0),
+        "rejected": status_counts.get(RideStatus.REJECTED, 0),
+        "cancelled": (
+            status_counts.get(RideStatus.CANCELLED, 0)
+            + status_counts.get(RideStatus.ABORTED, 0)
+        ),
+        "events": RideEvent.objects.count(),
+        "approval_decisions": RideApprovalStep.objects.filter(
+            status__in=[StepStatus.APPROVED, StepStatus.REJECTED]
+        ).count(),
+    }
+
+    filter_params = request.GET.copy()
+    filter_params.pop("page", None)
+    filter_query = filter_params.urlencode()
+
+    return render(request, "transport/history.html", {
+        "tab": tab,
+        "page_obj": page_obj,
+        "stats": stats,
+        "status_choices": RideStatus.choices,
+        "ride_type_choices": RideType.choices,
+        "event_type_choices": RideEventType.choices,
+        "selected_status": status,
+        "selected_ride_type": ride_type,
+        "selected_event_type": event_type,
+        "date_from": request.GET.get("date_from") or "",
+        "date_to": request.GET.get("date_to") or "",
+        "q": q,
+        "filter_query": filter_query,
+        "can_manage": user_has_permission(request.user, "manage_transport"),
     })
 
 

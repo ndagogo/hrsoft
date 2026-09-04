@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block title %}Transport history{% endblock %}
+{% block page_title %}Transport history{% endblock %}
+{% block page_subtitle %}All ride requests, approvals, and status changes{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+  <div>
+    <h2 class="section-heading">Transport management history</h2>
+    <p class="section-subtext mb-0">Complete record of requests, approval decisions, and operational events.</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{% url 'transport:hub' %}" class="btn btn-light btn-sm">Hub</a>
+    <a href="{% url 'transport:rides' %}" class="btn btn-light btn-sm">Rides</a>
+    {% if can_manage %}<a href="{% url 'transport:approvals' %}" class="btn btn-light btn-sm">Pending approvals</a>{% endif %}
+    <a href="{% url 'transport:history' %}" class="btn btn-light btn-sm"><i class="bi bi-clock-history me-1"></i>History</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="All requests" value=stats.total_rides icon="bi-signpost-2" accent="ink" %}</div>
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Pending approval" value=stats.pending icon="bi-hourglass-split" accent="amber" %}</div>
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Active journeys" value=stats.active icon="bi-truck" accent="teal" %}</div>
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Completed" value=stats.completed icon="bi-check-circle" accent="green" %}</div>
+</div>
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Rejected" value=stats.rejected icon="bi-x-circle" accent="rose" %}</div>
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Cancelled / aborted" value=stats.cancelled icon="bi-slash-circle" accent="violet" %}</div>
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Approval decisions" value=stats.approval_decisions icon="bi-clipboard-check" accent="amber" %}</div>
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Timeline events" value=stats.events icon="bi-clock-history" accent="ink" %}</div>
+</div>
+
+<div class="surface-card mb-3">
+  <div class="surface-card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <input type="hidden" name="tab" value="{{ tab }}">
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold">Search</label>
+        <input type="search" name="q" value="{{ q }}" class="form-control" placeholder="Ref, origin, vehicle, person…">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Ride status</label>
+        <select name="status" class="form-select">
+          <option value="">All statuses</option>
+          {% for val, label in status_choices %}
+          <option value="{{ val }}" {% if selected_status == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Ride type</label>
+        <select name="ride_type" class="form-select">
+          <option value="">All types</option>
+          {% for val, label in ride_type_choices %}
+          <option value="{{ val }}" {% if selected_ride_type == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if tab == "activity" %}
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Event type</label>
+        <select name="event_type" class="form-select">
+          <option value="">All events</option>
+          {% for val, label in event_type_choices %}
+          <option value="{{ val }}" {% if selected_event_type == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">From</label>
+        <input type="date" name="date_from" value="{{ date_from }}" class="form-control">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">To</label>
+        <input type="date" name="date_to" value="{{ date_to }}" class="form-control">
+      </div>
+      <div class="col-md-auto d-flex gap-2">
+        <button class="btn btn-amber">Filter</button>
+        <a href="{% url 'transport:history' %}?tab={{ tab }}" class="btn btn-light">Reset</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<ul class="nav nav-pills gap-2 mb-3 flex-wrap">
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'requests' %}active{% endif %}" href="?tab=requests{% if q %}&q={{ q|urlencode }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_ride_type %}&ride_type={{ selected_ride_type }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
+      All requests
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'approvals' %}active{% endif %}" href="?tab=approvals{% if q %}&q={{ q|urlencode }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_ride_type %}&ride_type={{ selected_ride_type }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
+      Approvals
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'activity' %}active{% endif %}" href="?tab=activity{% if q %}&q={{ q|urlencode }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_ride_type %}&ride_type={{ selected_ride_type }}{% endif %}{% if selected_event_type %}&event_type={{ selected_event_type }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
+      Activity timeline
+    </a>
+  </li>
+</ul>
+
+<div class="surface-card">
+  {% if tab == "requests" %}
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead>
+        <tr>
+          <th>Ref</th>
+          <th>Type</th>
+          <th>Requester / organizer</th>
+          <th>Origin</th>
+          <th>Departure</th>
+          <th>Vehicle</th>
+          <th>Passengers</th>
+          <th>Status</th>
+          <th>Approval stage</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in page_obj %}
+        <tr>
+          <td><a class="fw-semibold text-decoration-none" href="{% url 'transport:ride_detail' r.pk %}">{{ r.reference }}</a></td>
+          <td>{{ r.get_ride_type_display }}</td>
+          <td>
+            {% if r.requester %}
+              {{ r.requester.full_name }}
+            {% elif r.organizer %}
+              <span class="text-secondary small">Org:</span> {{ r.organizer.get_full_name|default:r.organizer.username }}
+            {% else %}—{% endif %}
+          </td>
+          <td>{{ r.origin_label|truncatechars:36 }}</td>
+          <td>{{ r.scheduled_departure|date:"M d, Y H:i" }}</td>
+          <td>{{ r.vehicle.registration_number|default:"—" }}</td>
+          <td>{{ r.passengers.all|length }}</td>
+          <td><span class="status-pill status-{{ r.status }}">{{ r.get_status_display }}</span></td>
+          <td class="small text-secondary">
+            {% if r.current_stage %}{{ r.get_current_stage_display }}{% else %}—{% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="9"><div class="empty-state"><i class="bi bi-clock-history"></i>No ride requests match these filters.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% elif tab == "approvals" %}
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Ride</th>
+          <th>Stage</th>
+          <th>Decision</th>
+          <th>Acted by</th>
+          <th>Note</th>
+          <th>Ride status now</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for s in page_obj %}
+        <tr>
+          <td class="text-secondary small">{{ s.acted_at|date:"M d, Y H:i"|default:"—" }}</td>
+          <td>
+            <a class="fw-semibold text-decoration-none" href="{% url 'transport:ride_detail' s.ride_id %}">{{ s.ride.reference }}</a>
+            <div class="text-secondary small">{{ s.ride.origin_label|truncatechars:32 }}</div>
+          </td>
+          <td>{{ s.get_stage_display }}</td>
+          <td><span class="status-pill status-{{ s.status }}">{{ s.get_status_display }}</span></td>
+          <td>{{ s.acted_by.get_full_name|default:s.acted_by.username|default:"—" }}</td>
+          <td class="small">{{ s.note|default:"—"|truncatechars:60 }}</td>
+          <td><span class="status-pill status-{{ s.ride.status }}">{{ s.ride.get_status_display }}</span></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7"><div class="empty-state"><i class="bi bi-clipboard-check"></i>No approval decisions yet.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% else %}
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Ride</th>
+          <th>Event</th>
+          <th>Message</th>
+          <th>Actor</th>
+          <th>Ride status</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for e in page_obj %}
+        <tr>
+          <td class="text-secondary small text-nowrap">{{ e.created_at|date:"M d, Y H:i" }}</td>
+          <td><a class="fw-semibold text-decoration-none" href="{% url 'transport:ride_detail' e.ride_id %}">{{ e.ride.reference }}</a></td>
+          <td><span class="chip">{{ e.get_event_type_display }}</span></td>
+          <td style="max-width:280px;">{{ e.message|truncatechars:90 }}</td>
+          <td class="small">{{ e.actor.get_full_name|default:e.actor.username|default:"System" }}</td>
+          <td><span class="status-pill status-{{ e.ride.status }}">{{ e.ride.get_status_display }}</span></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6"><div class="empty-state"><i class="bi bi-activity"></i>No activity events match these filters.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if page_obj.has_other_pages %}
+  <div class="surface-card-body border-top">
+    <nav>
+      <ul class="pagination mb-0 justify-content-center">
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?{% if filter_query %}{{ filter_query }}&{% endif %}page={{ page_obj.previous_page_number }}">Previous</a></li>
+        {% endif %}
+        <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?{% if filter_query %}{{ filter_query }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

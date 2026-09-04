@@ -15,6 +15,7 @@ urlpatterns = [
     path("drivers/new/", views.driver_create, name="driver_create"),
     path("drivers/<int:pk>/edit/", views.driver_edit, name="driver_edit"),
     path("rides/", views.ride_list, name="rides"),
+    path("history/", views.transport_history, name="history"),
     path("rides/new/", views.ride_create, name="ride_create"),
     path("shuttles/new/", views.shuttle_create, name="shuttle_create"),
     path("api/geocode/", views.api_geocode, name="api_geocode"),
