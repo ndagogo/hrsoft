@@ -8,6 +8,9 @@
 <div class="row g-3">
   <div class="col-lg-5">
     <div class="surface-card">
+      {% if vehicle.photo %}
+      <img src="{{ vehicle.photo.url }}" alt="{{ vehicle.name }}" class="w-100" style="max-height:240px;object-fit:cover;border-radius:12px 12px 0 0;">
+      {% endif %}
       <div class="surface-card-body">
         <div class="mb-2"><span class="chip">{{ vehicle.get_vehicle_type_display }}</span>
           <span class="status-pill status-{{ vehicle.status }} ms-1">{{ vehicle.get_status_display }}</span></div>

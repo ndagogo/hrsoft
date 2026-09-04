@@ -23,7 +23,8 @@ class VehicleForm(forms.ModelForm):
         model = Vehicle
         fields = [
             "name", "registration_number", "vehicle_type", "make", "model_name",
-            "year", "color", "capacity", "branch", "status", "gps_device_id", "notes", "is_active",
+            "year", "color", "capacity", "branch", "status", "gps_device_id",
+            "photo", "notes", "is_active",
         ]
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control"}),
@@ -37,6 +38,10 @@ class VehicleForm(forms.ModelForm):
             "branch": forms.Select(attrs={"class": "form-select"}),
             "status": forms.Select(attrs={"class": "form-select"}),
             "gps_device_id": forms.TextInput(attrs={"class": "form-control"}),
+            "photo": forms.ClearableFileInput(attrs={
+                "class": "form-control",
+                "accept": "image/*",
+            }),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
             "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }

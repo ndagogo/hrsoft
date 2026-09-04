@@ -23,6 +23,7 @@
     <table class="table table-hrms mb-0">
       <thead>
         <tr>
+          <th style="width:3.5rem;"></th>
           <th>Vehicle</th><th>Reg.</th><th>Type</th><th>Capacity</th><th>Status</th>
           {% if can_manage %}<th class="text-end">Actions</th>{% endif %}
         </tr>
@@ -30,6 +31,13 @@
       <tbody>
       {% for v in vehicles %}
         <tr>
+          <td>
+            {% if v.photo %}
+            <img src="{{ v.photo.url }}" alt="" class="rounded" style="width:40px;height:40px;object-fit:cover;">
+            {% else %}
+            <div class="rounded d-flex align-items-center justify-content-center bg-light text-secondary" style="width:40px;height:40px;"><i class="bi bi-truck"></i></div>
+            {% endif %}
+          </td>
           <td class="fw-semibold"><a href="{% url 'transport:vehicle_detail' v.pk %}" class="text-decoration-none text-reset">{{ v.name }}</a></td>
           <td><span class="chip">{{ v.registration_number }}</span></td>
           <td>{{ v.get_vehicle_type_display }}</td>
@@ -42,7 +50,7 @@
           {% endif %}
         </tr>
       {% empty %}
-        <tr><td colspan="6"><div class="empty-state"><i class="bi bi-truck"></i>No vehicles yet.</div></td></tr>
+        <tr><td colspan="7"><div class="empty-state"><i class="bi bi-truck"></i>No vehicles yet.</div></td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -53,7 +61,7 @@
 <div class="modal fade" id="newVehicleModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content">
-      <form method="post" action="{% url 'transport:vehicle_create' %}">
+      <form method="post" action="{% url 'transport:vehicle_create' %}" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="modal-header"><h5 class="modal-title font-display">Register vehicle</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
@@ -66,6 +74,11 @@
             <div class="col-md-4"><label class="form-label small fw-semibold">Make</label>{{ form.make }}</div>
             <div class="col-md-4"><label class="form-label small fw-semibold">Model</label>{{ form.model_name }}</div>
             <div class="col-md-4"><label class="form-label small fw-semibold">Branch</label>{{ form.branch }}</div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Vehicle photo</label>
+              {{ form.photo }}
+              <div class="form-text">Optional. JPG, PNG, or WebP.</div>
+            </div>
             <div class="col-12"><label class="form-label small fw-semibold">Notes</label>{{ form.notes }}</div>
             <div class="col-12 form-check ms-1">{{ form.is_active }} <label class="form-check-label">Active</label></div>
           </div>
@@ -80,7 +93,7 @@
 <div class="modal fade" id="editVehicle{{ v.pk }}" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content">
-      <form method="post" action="{% url 'transport:vehicle_edit' v.pk %}">
+      <form method="post" action="{% url 'transport:vehicle_edit' v.pk %}" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="modal-header"><h5 class="modal-title font-display">Edit {{ v.name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
@@ -101,6 +114,20 @@
             <div class="col-md-4"><label class="form-label small fw-semibold">GPS device ID</label><input class="form-control" name="gps_device_id" value="{{ v.gps_device_id }}"></div>
             <div class="col-md-8"><label class="form-label small fw-semibold">Branch</label>
               <select class="form-select" name="branch"><option value="">—</option>{% for b in form.fields.branch.queryset %}<option value="{{ b.pk }}" {% if v.branch_id == b.pk %}selected{% endif %}>{{ b.name }}</option>{% endfor %}</select>
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Vehicle photo</label>
+              {% if v.photo %}
+              <div class="d-flex align-items-center gap-3 mb-2">
+                <img src="{{ v.photo.url }}" alt="" class="rounded" style="width:72px;height:72px;object-fit:cover;">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="photo-clear" id="clearPhoto{{ v.pk }}">
+                  <label class="form-check-label small" for="clearPhoto{{ v.pk }}">Remove current photo</label>
+                </div>
+              </div>
+              {% endif %}
+              <input class="form-control" type="file" name="photo" accept="image/*">
+              <div class="form-text">Leave blank to keep the current photo.</div>
             </div>
             <div class="col-12"><label class="form-label small fw-semibold">Notes</label><textarea class="form-control" name="notes" rows="2">{{ v.notes }}</textarea></div>
             <div class="col-12 form-check ms-1"><input class="form-check-input" type="checkbox" name="is_active" {% if v.is_active %}checked{% endif %}> <label class="form-check-label">Active</label></div>

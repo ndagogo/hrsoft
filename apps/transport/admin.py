@@ -8,6 +8,11 @@ class VehicleAdmin(admin.ModelAdmin):
     list_display = ("name", "registration_number", "vehicle_type", "capacity", "status", "is_active")
     list_filter = ("status", "vehicle_type", "is_active")
     search_fields = ("name", "registration_number")
+    fields = (
+        "name", "registration_number", "vehicle_type", "make", "model_name",
+        "year", "color", "capacity", "branch", "status", "gps_device_id",
+        "photo", "notes", "is_active",
+    )
 
 
 @admin.register(models.Driver)

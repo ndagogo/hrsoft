@@ -166,6 +166,12 @@ class Vehicle(models.Model):
     )
     status = models.CharField(max_length=20, choices=VehicleStatus.choices, default=VehicleStatus.AVAILABLE)
     gps_device_id = models.CharField(max_length=80, blank=True, help_text="Optional dedicated tracker ID.")
+    photo = models.ImageField(
+        upload_to="transport/vehicles/photos/%Y/%m/",
+        blank=True,
+        null=True,
+        help_text="Optional photo of the vehicle.",
+    )
     notes = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -176,6 +182,12 @@ class Vehicle(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.registration_number})"
+
+    @property
+    def photo_url(self):
+        if self.photo:
+            return self.photo.url
+        return ""
 
 
 class Driver(models.Model):

@@ -145,7 +145,7 @@ def vehicle_list(request):
 @permission_required("manage_transport")
 def vehicle_create(request):
     if request.method == "POST":
-        form = VehicleForm(request.POST)
+        form = VehicleForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
             messages.success(request, "Vehicle registered.")
@@ -159,7 +159,7 @@ def vehicle_create(request):
 def vehicle_edit(request, pk):
     vehicle = get_object_or_404(Vehicle, pk=pk)
     if request.method == "POST":
-        form = VehicleForm(request.POST, instance=vehicle)
+        form = VehicleForm(request.POST, request.FILES, instance=vehicle)
         if form.is_valid():
             form.save()
             messages.success(request, "Vehicle updated.")
