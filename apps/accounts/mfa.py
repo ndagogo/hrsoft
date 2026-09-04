@@ -6,7 +6,6 @@ import secrets
 
 import pyotp
 import qrcode
-from django.conf import settings
 from django.utils import timezone
 
 
@@ -26,7 +25,8 @@ def verify_token(secret, token):
 
 
 def provisioning_uri(user, secret):
-    issuer = getattr(settings, "COMPANY_NAME", "HRMS")
+    from apps.system_settings.services import branding
+    issuer = branding()["COMPANY_NAME"]
     return get_totp(secret).provisioning_uri(name=user.email or user.username, issuer_name=issuer)
 
 

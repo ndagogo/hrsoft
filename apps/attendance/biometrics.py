@@ -254,8 +254,13 @@ def recompute_daily_attendance(employee, day):
     if check_out and check_out > check_in:
         worked_hours = round((check_out - check_in).total_seconds() / 3600, 2)
 
-    workday_start_str = settings.BIOMETRIC_SETTINGS["DEFAULT_WORKDAY_START"]
-    grace = settings.BIOMETRIC_SETTINGS["LATE_GRACE_MINUTES"]
+    from apps.system_settings.services import get_setting
+
+    workday_start_str = get_setting("workday_start", settings.BIOMETRIC_SETTINGS["DEFAULT_WORKDAY_START"])
+    try:
+        grace = int(get_setting("late_grace_minutes", settings.BIOMETRIC_SETTINGS["LATE_GRACE_MINUTES"]))
+    except (TypeError, ValueError):
+        grace = settings.BIOMETRIC_SETTINGS["LATE_GRACE_MINUTES"]
     expected_start = datetime.combine(day, datetime.strptime(workday_start_str, "%H:%M").time())
     if timezone.is_naive(expected_start):
         expected_start = timezone.make_aware(expected_start)

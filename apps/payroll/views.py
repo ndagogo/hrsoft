@@ -17,9 +17,7 @@ from .forms import PayrollPeriodForm, PayslipAdjustmentForm
 from .exports import payslip_pdf_response, bank_schedule_response
 
 
-TAX_RATE = Decimal("0.075")
-PENSION_RATE = Decimal("0.08")
-LATE_PENALTY_PER_INSTANCE = Decimal("1000")
+from apps.system_settings.services import decimal_setting, percent_rate
 
 
 def _notify_payroll_stakeholders(period, title, message):
@@ -71,9 +69,9 @@ def run_payroll(request, pk):
         basic = employee.basic_salary
         housing = basic * Decimal("0.15")
         transport = basic * Decimal("0.10")
-        tax = basic * TAX_RATE
-        pension = basic * PENSION_RATE
-        late_penalty = Decimal(days_late) * LATE_PENALTY_PER_INSTANCE
+        tax = basic * percent_rate("tax_rate", "7.5")
+        pension = basic * percent_rate("pension_rate", "8")
+        late_penalty = Decimal(days_late) * decimal_setting("late_penalty", "1000")
 
         payslip, _ = Payslip.objects.update_or_create(
             period=period,

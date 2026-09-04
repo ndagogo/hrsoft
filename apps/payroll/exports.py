@@ -3,7 +3,6 @@
 import io
 from decimal import Decimal
 
-from django.conf import settings
 from django.http import HttpResponse
 
 from apps.core.exports import build_csv_response, build_excel_response
@@ -20,8 +19,10 @@ def payslip_pdf_response(payslip):
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2 * cm, leftMargin=2 * cm, topMargin=2 * cm, bottomMargin=2 * cm)
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle("Title", parent=styles["Heading1"], fontSize=18, spaceAfter=12)
-    currency = getattr(settings, "COMPANY_CURRENCY_SYMBOL", "₦")
-    company = getattr(settings, "COMPANY_NAME", "Company")
+    from apps.system_settings.services import branding
+    brand = branding()
+    currency = brand["COMPANY_CURRENCY_SYMBOL"]
+    company = brand["COMPANY_NAME"]
     emp = payslip.employee
     period = payslip.period
 

@@ -4,7 +4,6 @@ import io
 import secrets
 
 import qrcode
-from django.conf import settings
 from django.http import HttpResponse
 from django.urls import reverse
 
@@ -33,7 +32,8 @@ def approval_letter_pdf_response(leave_request: LeaveRequest, request=None) -> H
     from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
     doc_record = ensure_approval_document(leave_request)
-    company = getattr(settings, "COMPANY_NAME", "Company")
+    from apps.system_settings.services import branding
+    company = branding()["COMPANY_NAME"]
     emp = leave_request.employee
     stand_in = leave_request.stand_in_employee
 

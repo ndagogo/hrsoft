@@ -10,7 +10,6 @@ from django.contrib.auth import get_user_model
 
 from apps.rbac.catalog import (
     BASE_DEPARTMENTS,
-    DEFAULT_SYSTEM_SETTINGS,
     LEAVE_TYPES,
     permission_catalog,
     system_roles,
@@ -147,17 +146,8 @@ def _upsert_asset_categories():
 
 
 def _upsert_system_settings():
-    from apps.system_settings.models import SystemSetting
-
-    created = 0
-    for key, value, category, description in DEFAULT_SYSTEM_SETTINGS:
-        _, was_created = SystemSetting.objects.get_or_create(
-            key=key,
-            defaults={"value": value, "category": category, "description": description},
-        )
-        if was_created:
-            created += 1
-    return created
+    from apps.system_settings.services import ensure_default_settings
+    return ensure_default_settings()
 
 
 def _link_superusers(admin_role):

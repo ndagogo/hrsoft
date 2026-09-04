@@ -1,12 +1,11 @@
 from django.conf import settings
+from apps.system_settings.services import branding as live_branding
 
 
 def site_branding(request):
-    return {
-        "COMPANY_NAME": settings.COMPANY_NAME,
-        "COMPANY_CURRENCY_SYMBOL": settings.COMPANY_CURRENCY_SYMBOL,
-        "IDLE_SESSION_TIMEOUT_SECONDS": getattr(settings, "IDLE_SESSION_TIMEOUT_SECONDS", 120),
-    }
+    data = live_branding()
+    data["IDLE_SESSION_TIMEOUT_SECONDS"] = getattr(settings, "IDLE_SESSION_TIMEOUT_SECONDS", 120)
+    return data
 
 
 def nav_permissions(request):

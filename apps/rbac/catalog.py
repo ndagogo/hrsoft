@@ -159,11 +159,17 @@ LEAVE_TYPES = [
 
 # (key, value, category, description) — inserted only if the key is missing
 DEFAULT_SYSTEM_SETTINGS = [
-    ("workday_start", "09:00", "attendance", "Default workday start time."),
-    ("workday_end", "17:00", "attendance", "Default workday end time."),
+    ("company_name", "Health Focus Diagnostics Nigeria", "company", "Display name used in the sidebar, login page and PDF documents."),
+    ("company_currency", "NGN", "company", "ISO currency code (e.g. NGN)."),
+    ("company_currency_symbol", "₦", "company", "Currency symbol shown on payroll and reports."),
+    ("workday_start", "09:00", "attendance", "Default workday start time (HH:MM)."),
+    ("workday_end", "17:00", "attendance", "Default workday end time (HH:MM)."),
+    ("late_grace_minutes", "10", "attendance", "Minutes after workday start before a punch is marked late."),
     ("tax_rate", "7.5", "payroll", "Default PAYE tax rate (%)."),
     ("pension_rate", "8", "payroll", "Default employee pension rate (%)."),
+    ("late_penalty", "1000", "payroll", "Penalty amount per late day when running payroll."),
     ("annual_leave_days", "21", "leave", "Default annual leave entitlement (days)."),
+    ("company_email", "", "email", "Default HR / company contact email."),
 ]
 
 # First-install org only (used with --with-org). Identity is code, not name.

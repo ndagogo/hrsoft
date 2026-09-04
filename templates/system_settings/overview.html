@@ -1,16 +1,192 @@
 {% extends "base.html" %}
 {% block title %}Settings{% endblock %}
 {% block page_title %}System Settings{% endblock %}
-{% block page_subtitle %}Company configuration & holiday calendar{% endblock %}
+{% block page_subtitle %}Company configuration &amp; holiday calendar{% endblock %}
+
 {% block content %}
-<div class="row g-3">
-  <div class="col-xl-7"><div class="surface-card"><div class="surface-card-header"><h3 class="surface-card-title">Settings</h3></div>
-  <div class="table-responsive"><table class="table table-hrms mb-0"><thead><tr><th>Key</th><th>Value</th><th>Category</th></tr></thead><tbody>
-  {% for s in settings %}<tr><td class="fw-semibold">{{ s.key }}</td><td>{{ s.value|truncatechars:50 }}</td><td><span class="chip">{{ s.get_category_display }}</span></td></tr>{% empty %}<tr><td colspan="3"><div class="empty-state"><i class="bi bi-gear"></i>No settings configured.</div></td></tr>{% endfor %}
-  </tbody></table></div></div></div>
-  <div class="col-xl-5"><div class="surface-card"><div class="surface-card-header"><h3 class="surface-card-title">Holiday Calendar</h3></div>
-  <div class="table-responsive"><table class="table table-hrms mb-0"><thead><tr><th>Holiday</th><th>Date</th></tr></thead><tbody>
-  {% for h in holidays %}<tr><td>{{ h.name }}</td><td>{{ h.date|date:"M d, Y" }}</td></tr>{% empty %}<tr><td colspan="2"><div class="empty-state"><i class="bi bi-calendar"></i>No holidays set.</div></td></tr>{% endfor %}
-  </tbody></table></div></div></div>
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+  <div>
+    <h2 class="section-heading">Configuration</h2>
+    <p class="section-subtext mb-0">Values here drive branding, payroll rates, work hours and the holiday calendar. Changes take effect immediately.</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#newHolidayModal"><i class="bi bi-calendar-plus me-1"></i>New holiday</button>
+    <button class="btn btn-amber" data-bs-toggle="modal" data-bs-target="#newSettingModal"><i class="bi bi-plus-lg me-1"></i>New setting</button>
+  </div>
 </div>
+
+<div class="row g-3">
+  <div class="col-xl-7">
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title">Settings</h3></div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead>
+            <tr><th>Key</th><th>Value</th><th>Category</th><th class="text-end">Actions</th></tr>
+          </thead>
+          <tbody>
+          {% for s in settings %}
+            <tr>
+              <td>
+                <div class="fw-semibold">{{ s.key }}</div>
+                {% if s.description %}<div class="text-secondary small">{{ s.description }}</div>{% endif %}
+              </td>
+              <td class="text-break" style="max-width:18rem;">{{ s.value|default:"—" }}</td>
+              <td><span class="chip">{{ s.get_category_display }}</span></td>
+              <td class="text-end text-nowrap">
+                <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#editSetting{{ s.pk }}" title="Edit"><i class="bi bi-pencil"></i></button>
+                <form method="post" action="{% url 'system_settings:setting_delete' s.pk %}" class="d-inline" onsubmit="return confirm('Delete setting “{{ s.key }}”? Missing keys fall back to built-in defaults.');">
+                  {% csrf_token %}
+                  <button class="btn btn-sm btn-light text-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4"><div class="empty-state"><i class="bi bi-gear"></i>No settings configured.</div></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-5">
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title">Holiday calendar</h3></div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead>
+            <tr><th>Holiday</th><th>Date</th><th class="text-end">Actions</th></tr>
+          </thead>
+          <tbody>
+          {% for h in holidays %}
+            <tr>
+              <td>
+                <div class="fw-semibold">{{ h.name }}</div>
+                <div class="text-secondary small">
+                  {% if h.is_recurring %}Recurring{% else %}One-off{% endif %}
+                  · {{ h.branch.name|default:"All branches" }}
+                </div>
+              </td>
+              <td>{{ h.date|date:"M d, Y" }}</td>
+              <td class="text-end text-nowrap">
+                <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#editHoliday{{ h.pk }}" title="Edit"><i class="bi bi-pencil"></i></button>
+                <form method="post" action="{% url 'system_settings:holiday_delete' h.pk %}" class="d-inline" onsubmit="return confirm('Delete holiday “{{ h.name }}”?');">
+                  {% csrf_token %}
+                  <button class="btn btn-sm btn-light text-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="3"><div class="empty-state"><i class="bi bi-calendar"></i>No holidays set.</div></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="newSettingModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'system_settings:setting_create' %}">
+        {% csrf_token %}
+        <div class="modal-header"><h5 class="modal-title font-display">New setting</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-3"><label class="form-label small fw-semibold">Key</label>{{ setting_form.key }}</div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Value</label>{{ setting_form.value }}</div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Category</label>{{ setting_form.category }}</div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Description</label>{{ setting_form.description }}</div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-amber">Create</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="newHolidayModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'system_settings:holiday_create' %}">
+        {% csrf_token %}
+        <div class="modal-header"><h5 class="modal-title font-display">New holiday</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-3"><label class="form-label small fw-semibold">Name</label>{{ holiday_form.name }}</div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Date</label>{{ holiday_form.date }}</div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Branch</label>{{ holiday_form.branch }}</div>
+          <div class="form-check">{{ holiday_form.is_recurring }} <label class="form-check-label" for="{{ holiday_form.is_recurring.id_for_label }}">Repeats every year</label></div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-amber">Add holiday</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% for s in settings %}
+<div class="modal fade" id="editSetting{{ s.pk }}" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'system_settings:setting_edit' s.pk %}">
+        {% csrf_token %}
+        <div class="modal-header"><h5 class="modal-title font-display">Edit {{ s.key }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Key</label>
+            <input class="form-control" name="key" value="{{ s.key }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Value</label>
+            <textarea class="form-control" name="value" rows="2">{{ s.value }}</textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Category</label>
+            <select class="form-select" name="category">
+              {% for val, label in setting_form.fields.category.choices %}
+                <option value="{{ val }}" {% if s.category == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Description</label>
+            <input class="form-control" name="description" value="{{ s.description }}">
+          </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-ink">Save changes</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{% for h in holidays %}
+<div class="modal fade" id="editHoliday{{ h.pk }}" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'system_settings:holiday_edit' h.pk %}">
+        {% csrf_token %}
+        <div class="modal-header"><h5 class="modal-title font-display">Edit holiday</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-3"><label class="form-label small fw-semibold">Name</label><input class="form-control" name="name" value="{{ h.name }}" required></div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Date</label><input class="form-control" type="date" name="date" value="{{ h.date|date:'Y-m-d' }}" required></div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Branch</label>
+            <select class="form-select" name="branch">
+              <option value="">All branches</option>
+              {% for opt in holiday_form.fields.branch.queryset %}
+                <option value="{{ opt.pk }}" {% if h.branch_id == opt.pk %}selected{% endif %}>{{ opt.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="is_recurring" id="editHolidayRecurring{{ h.pk }}" {% if h.is_recurring %}checked{% endif %}>
+            <label class="form-check-label" for="editHolidayRecurring{{ h.pk }}">Repeats every year</label>
+          </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-ink">Save changes</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
 {% endblock %}
