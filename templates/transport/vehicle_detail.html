@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{{ vehicle.name }}{% endblock %}
+{% block page_title %}{{ vehicle.name }}{% endblock %}
+{% block page_subtitle %}{{ vehicle.registration_number }}{% endblock %}
+
+{% block content %}
+<a href="{% url 'transport:vehicles' %}" class="btn btn-light btn-sm mb-3"><i class="bi bi-arrow-left me-1"></i>Fleet</a>
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="surface-card">
+      <div class="surface-card-body">
+        <div class="mb-2"><span class="chip">{{ vehicle.get_vehicle_type_display }}</span>
+          <span class="status-pill status-{{ vehicle.status }} ms-1">{{ vehicle.get_status_display }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Capacity</span><span class="fw-semibold">{{ vehicle.capacity }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Make / model</span><span>{{ vehicle.make }} {{ vehicle.model_name }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">Branch</span><span>{{ vehicle.branch.name|default:"—" }}</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="text-secondary">GPS device</span><span>{{ vehicle.gps_device_id|default:"—" }}</span></div>
+        {% if vehicle.notes %}<p class="mt-3 mb-0 small text-secondary">{{ vehicle.notes }}</p>{% endif %}
+      </div>
+    </div>
+    {% if can_manage %}
+    <div class="surface-card mt-3">
+      <div class="surface-card-header"><h3 class="surface-card-title">Upload document</h3></div>
+      <div class="surface-card-body">
+        <form method="post" action="{% url 'transport:vehicle_document_add' vehicle.pk %}" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="mb-2"><label class="form-label small fw-semibold">Title</label>{{ doc_form.title }}</div>
+          <div class="mb-2"><label class="form-label small fw-semibold">Type</label>{{ doc_form.document_type }}</div>
+          <div class="mb-2"><label class="form-label small fw-semibold">File</label>{{ doc_form.file }}</div>
+          <div class="mb-2"><label class="form-label small fw-semibold">Expires</label>{{ doc_form.expires_on }}</div>
+          <button class="btn btn-amber btn-sm">Upload</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  <div class="col-lg-7">
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title">Documents</h3></div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Title</th><th>Type</th><th>Expires</th></tr></thead>
+          <tbody>
+          {% for d in vehicle.documents.all %}
+            <tr>
+              <td>{% if d.file %}<a href="{{ d.file.url }}" target="_blank">{{ d.title }}</a>{% else %}{{ d.title }}{% endif %}</td>
+              <td>{{ d.get_document_type_display }}</td>
+              <td>{{ d.expires_on|date:"M d, Y"|default:"—" }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="3"><div class="empty-state"><i class="bi bi-file-earmark"></i>No documents.</div></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title">Upcoming rides</h3></div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Ref</th><th>Departure</th><th>Status</th></tr></thead>
+          <tbody>
+          {% for r in upcoming %}
+            <tr>
+              <td><a href="{% url 'transport:ride_detail' r.pk %}">{{ r.reference }}</a></td>
+              <td>{{ r.scheduled_departure|date:"M d, H:i" }}</td>
+              <td>{{ r.get_status_display }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="3"><div class="empty-state">No upcoming bookings.</div></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

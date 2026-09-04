@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}{{ ride.reference }}{% endblock %}
+{% block page_title %}{{ ride.reference }}{% endblock %}
+{% block page_subtitle %}{{ ride.get_status_display }} · {{ ride.get_ride_type_display }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between mb-3 flex-wrap gap-2">
+  <a href="{% url 'transport:rides' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Rides</a>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if can_submit %}
+    <form method="post" action="{% url 'transport:ride_submit' ride.pk %}">{% csrf_token %}<button class="btn btn-amber btn-sm">Submit for approval</button></form>
+    {% endif %}
+    {% if can_review %}
+    <form method="post" action="{% url 'transport:ride_review' ride.pk 'approve' %}" class="d-inline">{% csrf_token %}<input type="hidden" name="next" value="{% url 'transport:ride_detail' ride.pk %}"><button class="btn btn-amber btn-sm">Approve</button></form>
+    <form method="post" action="{% url 'transport:ride_review' ride.pk 'reject' %}" class="d-inline" data-confirm="Reject this ride?">{% csrf_token %}<input type="hidden" name="next" value="{% url 'transport:ride_detail' ride.pk %}"><button class="btn btn-light btn-sm text-danger">Reject</button></form>
+    {% endif %}
+    {% if can_accept_driver %}
+    <form method="post" action="{% url 'transport:driver_accept' ride.pk %}">{% csrf_token %}<button class="btn btn-amber btn-sm">Accept assignment</button></form>
+    {% endif %}
+    {% if can_start %}
+    <form method="post" action="{% url 'transport:ride_start' ride.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{% url 'transport:ride_detail' ride.pk %}"><button class="btn btn-amber btn-sm"><i class="bi bi-play-fill me-1"></i>Start journey</button></form>
+    {% endif %}
+    {% if can_complete %}
+    <form method="post" action="{% url 'transport:ride_complete' ride.pk %}">{% csrf_token %}<button class="btn btn-ink btn-sm">End ride</button></form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="surface-card mb-3">
+      <div class="surface-card-body">
+        <div class="row g-2">
+          <div class="col-md-6"><div class="text-secondary small">Origin</div><div class="fw-semibold">{{ ride.origin_label }}</div></div>
+          <div class="col-md-6"><div class="text-secondary small">Departure</div><div class="fw-semibold">{{ ride.scheduled_departure|date:"D, M d · H:i" }}</div></div>
+          <div class="col-md-6"><div class="text-secondary small">Vehicle</div><div>{{ ride.vehicle.name|default:"—" }} <span class="chip">{{ ride.vehicle.registration_number|default:"" }}</span></div></div>
+          <div class="col-md-6"><div class="text-secondary small">Driver</div><div>{% if ride.driver %}{{ ride.driver.employee.full_name }}{% else %}—{% endif %}</div></div>
+          <div class="col-md-6"><div class="text-secondary small">Seats</div><div>{{ ride.seats_reserved }} reserved · {{ ride.seats_available }} available / {{ ride.capacity }}</div></div>
+          <div class="col-md-6"><div class="text-secondary small">Purpose</div><div>{{ ride.purpose|default:"—" }}</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title">Passengers &amp; destinations</h3></div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Passenger</th><th>Destination</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+          {% for p in ride.passengers.all %}
+            <tr>
+              <td class="fw-semibold">{{ p.employee.full_name }}</td>
+              <td>{{ p.destination_label }}</td>
+              <td><span class="status-pill status-{{ p.status }}">{{ p.get_status_display }}</span></td>
+              <td class="text-end">
+                {% if can_complete or can_start %}
+                  {% if p.status == 'onboard' or p.status == 'confirmed' or p.status == 'boarding' %}
+                  {% if ride.status == 'in_progress' %}
+                  <form method="post" action="{% url 'transport:passenger_arrived' ride.pk p.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-light">Mark arrived</button></form>
+                  {% endif %}
+                  {% endif %}
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4"><div class="empty-state">No passengers.</div></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title">Stops (ordered)</h3></div>
+      <div class="surface-card-body">
+        <ol class="mb-0 ps-3">
+          <li class="mb-2"><span class="fw-semibold">Origin</span> — {{ ride.origin_label }}</li>
+          {% for s in ride.stops.all %}
+          <li class="mb-2">
+            <span class="fw-semibold">{{ s.label }}</span>
+            {% if s.is_completed %}<span class="chip ms-1">Done</span>{% endif %}
+            <div class="text-secondary small">{% for p in s.passengers.all %}{{ p.employee.full_name }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</div>
+          </li>
+          {% endfor %}
+        </ol>
+      </div>
+    </div>
+
+    {% if can_join %}
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title">Request to join (carpool)</h3></div>
+      <div class="surface-card-body">
+        <form method="post" action="{% url 'transport:join_request' ride.pk %}">
+          {% csrf_token %}
+          <div class="mb-2"><label class="form-label small fw-semibold">My destination</label>{{ join_form.destination_label }}</div>
+          <button class="btn btn-amber btn-sm">Request to join</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if pending_joins %}
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title">Pending join requests</h3></div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Employee</th><th>Destination</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+          {% for j in pending_joins %}
+            <tr>
+              <td>{{ j.employee.full_name }}</td>
+              <td>{{ j.destination_label }}</td>
+              <td>{{ j.get_status_display }}</td>
+              <td class="text-end text-nowrap">
+                {% if is_organizer and j.organizer_approved is None %}
+                <form method="post" action="{% url 'transport:join_decide' ride.pk j.pk 'approve' %}" class="d-inline">{% csrf_token %}<input type="hidden" name="as" value="organizer"><button class="btn btn-sm btn-light">Organizer ✓</button></form>
+                <form method="post" action="{% url 'transport:join_decide' ride.pk j.pk 'reject' %}" class="d-inline">{% csrf_token %}<input type="hidden" name="as" value="organizer"><button class="btn btn-sm btn-light text-danger">✕</button></form>
+                {% endif %}
+                {% if can_manage and j.admin_approved is None %}
+                <form method="post" action="{% url 'transport:join_decide' ride.pk j.pk 'approve' %}" class="d-inline">{% csrf_token %}<input type="hidden" name="as" value="admin"><button class="btn btn-sm btn-amber">Admin ✓</button></form>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-5">
+    <div class="surface-card mb-3">
+      <div class="surface-card-header"><h3 class="surface-card-title">Journey timeline</h3></div>
+      <div class="surface-card-body">
+        {% for e in events %}
+        <div class="d-flex gap-3 mb-3">
+          <div class="text-secondary small" style="min-width:3.5rem;">{{ e.created_at|date:"H:i" }}</div>
+          <div>
+            <div class="fw-semibold small">{{ e.get_event_type_display }}</div>
+            <div class="text-secondary" style="font-size:0.8rem;">{{ e.message }}</div>
+          </div>
+        </div>
+        {% empty %}
+        <div class="empty-state"><i class="bi bi-clock-history"></i>No events yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title">Approval steps</h3></div>
+      <div class="surface-card-body">
+        {% for s in ride.approval_steps.all %}
+        <div class="d-flex justify-content-between py-2 border-bottom">
+          <div>
+            <div class="fw-semibold small">{{ s.get_stage_display }}</div>
+            {% if s.acted_by %}<div class="text-secondary" style="font-size:0.75rem;">{{ s.acted_by.get_full_name|default:s.acted_by.username }} · {{ s.acted_at|date:"M d H:i" }}</div>{% endif %}
+          </div>
+          <span class="status-pill status-{{ s.status }}">{{ s.get_status_display }}</span>
+        </div>
+        {% empty %}
+        <div class="text-secondary small">No approval chain yet (draft).</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

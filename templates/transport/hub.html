@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Transport{% endblock %}
+{% block page_title %}Transportation{% endblock %}
+{% block page_subtitle %}Fleet, rides, carpool &amp; driver assignments{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+  <div>
+    <h2 class="section-heading">Transportation &amp; Fleet</h2>
+    <p class="section-subtext mb-0">Request official trips, join carpools, manage vehicles and drivers.</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if is_driver %}<a href="{% url 'transport:driver_portal' %}" class="btn btn-light btn-sm"><i class="bi bi-steering-wheel me-1"></i>Driver portal</a>{% endif %}
+    {% if can_approve %}<a href="{% url 'transport:approvals' %}" class="btn btn-light btn-sm"><i class="bi bi-clipboard-check me-1"></i>Approvals</a>{% endif %}
+    {% if can_view %}<a href="{% url 'transport:vehicles' %}" class="btn btn-light btn-sm"><i class="bi bi-truck me-1"></i>Fleet</a>{% endif %}
+    {% if can_create %}<a href="{% url 'transport:ride_create' %}" class="btn btn-amber btn-sm"><i class="bi bi-plus-lg me-1"></i>Request ride</a>{% endif %}
+  </div>
+</div>
+
+{% if stats %}
+<div class="row g-3 mb-4">
+  <div class="col-md-3">{% include "partials/_stat_card.html" with eyebrow="Vehicles" value=stats.vehicles icon="bi-truck" accent="ink" %}</div>
+  <div class="col-md-3">{% include "partials/_stat_card.html" with eyebrow="Drivers" value=stats.drivers icon="bi-person-badge" accent="teal" %}</div>
+  <div class="col-md-3">{% include "partials/_stat_card.html" with eyebrow="Active rides" value=stats.active_rides icon="bi-signpost-2" accent="amber" %}</div>
+  <div class="col-md-3">{% include "partials/_stat_card.html" with eyebrow="Pending approval" value=stats.pending_approvals icon="bi-hourglass-split" accent="violet" %}</div>
+</div>
+{% endif %}
+
+<div class="row g-3">
+  <div class="col-xl-6">
+    <div class="surface-card">
+      <div class="surface-card-header d-flex justify-content-between align-items-center">
+        <h3 class="surface-card-title mb-0">My rides</h3>
+        <a href="{% url 'transport:rides' %}" class="btn btn-sm btn-light">View all</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Ref</th><th>When</th><th>Vehicle</th><th>Status</th></tr></thead>
+          <tbody>
+          {% for r in my_rides %}
+            <tr>
+              <td><a href="{% url 'transport:ride_detail' r.pk %}" class="fw-semibold text-decoration-none">{{ r.reference }}</a></td>
+              <td>{{ r.scheduled_departure|date:"M d, H:i" }}</td>
+              <td>{{ r.vehicle.registration_number|default:"—" }}</td>
+              <td><span class="status-pill status-{{ r.status }}">{{ r.get_status_display }}</span></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4"><div class="empty-state"><i class="bi bi-signpost"></i>No rides yet.</div></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-6">
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title">Open carpools</h3></div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Departure</th><th>Route</th><th>Seats</th><th></th></tr></thead>
+          <tbody>
+          {% for r in open_carpools %}
+            <tr>
+              <td>{{ r.scheduled_departure|date:"M d, H:i" }}</td>
+              <td>
+                <div class="fw-semibold">{{ r.vehicle.name|default:"Vehicle" }}</div>
+                <div class="text-secondary small">{{ r.origin_label }}</div>
+              </td>
+              <td>{{ r.seats_available }}/{{ r.capacity }}</td>
+              <td class="text-end"><a href="{% url 'transport:ride_detail' r.pk %}" class="btn btn-sm btn-light">Open</a></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4"><div class="empty-state"><i class="bi bi-people"></i>No open carpools right now.</div></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

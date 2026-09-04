@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Driver portal{% endblock %}
+{% block page_title %}Driver portal{% endblock %}
+{% block page_subtitle %}{% if driver %}{{ driver.employee.full_name }}{% else %}Transport ops{% endif %}{% endblock %}
+
+{% block content %}
+<a href="{% url 'transport:hub' %}" class="btn btn-light btn-sm mb-3"><i class="bi bi-arrow-left me-1"></i>Hub</a>
+
+<div class="row g-3" style="max-width:560px;">
+{% for r in assigned %}
+  <div class="col-12">
+    <div class="surface-card">
+      <div class="surface-card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <div class="text-secondary small">{{ r.reference }}</div>
+            <h3 class="h5 font-display fw-semibold mb-0">{{ r.vehicle.name|default:"Vehicle" }}</h3>
+            <div class="chip mt-1">{{ r.vehicle.registration_number|default:"" }}</div>
+          </div>
+          <span class="status-pill status-{{ r.status }}">{{ r.get_status_display }}</span>
+        </div>
+        <div class="mb-2"><span class="text-secondary small">Origin</span><div class="fw-semibold">{{ r.origin_label }}</div></div>
+        <div class="mb-2"><span class="text-secondary small">Departure</span><div>{{ r.scheduled_departure|date:"D M d · H:i" }}</div></div>
+        <div class="mb-3"><span class="text-secondary small">Passengers</span>
+          <ul class="mb-0 ps-3">
+            {% for p in r.passengers.all %}
+            <li>{{ p.employee.full_name }} → {{ p.destination_label }} <span class="text-secondary">({{ p.get_status_display }})</span></li>
+            {% endfor %}
+          </ul>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <a href="{% url 'transport:ride_detail' r.pk %}" class="btn btn-light btn-sm">Open</a>
+          {% if r.status == 'driver_pending' %}
+          <form method="post" action="{% url 'transport:driver_accept' r.pk %}">{% csrf_token %}<button class="btn btn-amber btn-sm">Accept assignment</button></form>
+          <form method="post" action="{% url 'transport:driver_decline' r.pk %}">{% csrf_token %}<button class="btn btn-light btn-sm text-danger">Decline</button></form>
+          {% endif %}
+          {% if r.status == 'ready' or r.status == 'driver_accepted' %}
+          <form method="post" action="{% url 'transport:ride_start' r.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{% url 'transport:driver_portal' %}"><button class="btn btn-amber btn-sm"><i class="bi bi-play-fill me-1"></i>Start journey</button></form>
+          {% endif %}
+          {% if r.status == 'in_progress' %}
+          <form method="post" action="{% url 'transport:ride_complete' r.pk %}">{% csrf_token %}<button class="btn btn-ink btn-sm">End trip</button></form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% empty %}
+  <div class="col-12"><div class="empty-state surface-card py-5"><i class="bi bi-steering-wheel"></i>No active assignments.</div></div>
+{% endfor %}
+</div>
+{% endblock %}

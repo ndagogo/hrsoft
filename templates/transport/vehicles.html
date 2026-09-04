@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Fleet{% endblock %}
+{% block page_title %}Vehicles{% endblock %}
+{% block page_subtitle %}Fleet register{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between mb-4 flex-wrap gap-2">
+  <div>
+    <h2 class="section-heading">Fleet vehicles</h2>
+    <p class="section-subtext mb-0">Capacity, status and branch assignment.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'transport:hub' %}" class="btn btn-light btn-sm">Hub</a>
+    {% if can_manage %}
+    <a href="{% url 'transport:drivers' %}" class="btn btn-light btn-sm">Drivers</a>
+    <button class="btn btn-amber btn-sm" data-bs-toggle="modal" data-bs-target="#newVehicleModal"><i class="bi bi-plus-lg me-1"></i>Add vehicle</button>
+    {% endif %}
+  </div>
+</div>
+
+<div class="surface-card">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead>
+        <tr>
+          <th>Vehicle</th><th>Reg.</th><th>Type</th><th>Capacity</th><th>Status</th>
+          {% if can_manage %}<th class="text-end">Actions</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+      {% for v in vehicles %}
+        <tr>
+          <td class="fw-semibold"><a href="{% url 'transport:vehicle_detail' v.pk %}" class="text-decoration-none text-reset">{{ v.name }}</a></td>
+          <td><span class="chip">{{ v.registration_number }}</span></td>
+          <td>{{ v.get_vehicle_type_display }}</td>
+          <td>{{ v.capacity }}</td>
+          <td><span class="status-pill status-{{ v.status }}">{{ v.get_status_display }}</span></td>
+          {% if can_manage %}
+          <td class="text-end">
+            <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#editVehicle{{ v.pk }}"><i class="bi bi-pencil"></i></button>
+          </td>
+          {% endif %}
+        </tr>
+      {% empty %}
+        <tr><td colspan="6"><div class="empty-state"><i class="bi bi-truck"></i>No vehicles yet.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if can_manage and form %}
+<div class="modal fade" id="newVehicleModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <form method="post" action="{% url 'transport:vehicle_create' %}">
+        {% csrf_token %}
+        <div class="modal-header"><h5 class="modal-title font-display">Register vehicle</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-8"><label class="form-label small fw-semibold">Name</label>{{ form.name }}</div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Registration</label>{{ form.registration_number }}</div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Type</label>{{ form.vehicle_type }}</div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Capacity</label>{{ form.capacity }}</div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Status</label>{{ form.status }}</div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Make</label>{{ form.make }}</div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Model</label>{{ form.model_name }}</div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Branch</label>{{ form.branch }}</div>
+            <div class="col-12"><label class="form-label small fw-semibold">Notes</label>{{ form.notes }}</div>
+            <div class="col-12 form-check ms-1">{{ form.is_active }} <label class="form-check-label">Active</label></div>
+          </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-amber">Save</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% for v in vehicles %}
+<div class="modal fade" id="editVehicle{{ v.pk }}" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <form method="post" action="{% url 'transport:vehicle_edit' v.pk %}">
+        {% csrf_token %}
+        <div class="modal-header"><h5 class="modal-title font-display">Edit {{ v.name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-8"><label class="form-label small fw-semibold">Name</label><input class="form-control" name="name" value="{{ v.name }}" required></div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Registration</label><input class="form-control" name="registration_number" value="{{ v.registration_number }}" required></div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Type</label>
+              <select class="form-select" name="vehicle_type">{% for val,label in form.fields.vehicle_type.choices %}<option value="{{ val }}" {% if v.vehicle_type == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+            </div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Capacity</label><input class="form-control" type="number" name="capacity" value="{{ v.capacity }}" min="1"></div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Status</label>
+              <select class="form-select" name="status">{% for val,label in form.fields.status.choices %}<option value="{{ val }}" {% if v.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+            </div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Make</label><input class="form-control" name="make" value="{{ v.make }}"></div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Model</label><input class="form-control" name="model_name" value="{{ v.model_name }}"></div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Year</label><input class="form-control" type="number" name="year" value="{{ v.year|default:'' }}"></div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Color</label><input class="form-control" name="color" value="{{ v.color }}"></div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">GPS device ID</label><input class="form-control" name="gps_device_id" value="{{ v.gps_device_id }}"></div>
+            <div class="col-md-8"><label class="form-label small fw-semibold">Branch</label>
+              <select class="form-select" name="branch"><option value="">—</option>{% for b in form.fields.branch.queryset %}<option value="{{ b.pk }}" {% if v.branch_id == b.pk %}selected{% endif %}>{{ b.name }}</option>{% endfor %}</select>
+            </div>
+            <div class="col-12"><label class="form-label small fw-semibold">Notes</label><textarea class="form-control" name="notes" rows="2">{{ v.notes }}</textarea></div>
+            <div class="col-12 form-check ms-1"><input class="form-check-input" type="checkbox" name="is_active" {% if v.is_active %}checked{% endif %}> <label class="form-check-label">Active</label></div>
+          </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-ink">Save</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

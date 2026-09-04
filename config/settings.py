@@ -95,6 +95,7 @@ INSTALLED_APPS = [
     "apps.visitors",
     "apps.notifications",
     "apps.announcements",
+    "apps.transport",
     "apps.system_settings",
     "apps.reports",
     "apps.selfservice",

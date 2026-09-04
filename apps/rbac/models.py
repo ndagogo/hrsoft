@@ -17,6 +17,7 @@ class PermissionCategory(models.TextChoices):
     VISITORS = "visitors", "Visitors"
     ORGANIZATION = "organization", "Organization"
     ANNOUNCEMENTS = "announcements", "Announcements"
+    TRANSPORT = "transport", "Transport"
 
 
 class Permission(models.Model):

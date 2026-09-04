@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Transport approvals{% endblock %}
+{% block page_title %}Transport approvals{% endblock %}
+{% block page_subtitle %}Rides awaiting your decision{% endblock %}
+
+{% block content %}
+<a href="{% url 'transport:hub' %}" class="btn btn-light btn-sm mb-3"><i class="bi bi-arrow-left me-1"></i>Hub</a>
+<div class="surface-card">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead><tr><th>Ref</th><th>Requester</th><th>Origin</th><th>Departure</th><th>Stage</th><th></th></tr></thead>
+      <tbody>
+      {% for r in pending %}
+        <tr>
+          <td><a href="{% url 'transport:ride_detail' r.pk %}">{{ r.reference }}</a></td>
+          <td>{% if r.requester %}{{ r.requester.full_name }}{% else %}—{% endif %}</td>
+          <td>{{ r.origin_label|truncatechars:36 }}</td>
+          <td>{{ r.scheduled_departure|date:"M d, H:i" }}</td>
+          <td>{{ r.get_current_stage_display|default:r.current_stage }}</td>
+          <td class="text-end text-nowrap">
+            <form method="post" action="{% url 'transport:ride_review' r.pk 'approve' %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-amber">Approve</button></form>
+            <form method="post" action="{% url 'transport:ride_review' r.pk 'reject' %}" class="d-inline" data-confirm="Reject this ride?">{% csrf_token %}<button class="btn btn-sm btn-light text-danger">Reject</button></form>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6"><div class="empty-state"><i class="bi bi-clipboard-check"></i>Nothing waiting for you.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

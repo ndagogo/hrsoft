@@ -24,6 +24,7 @@ urlpatterns = [
     path("visitors/", include("apps.visitors.urls")),
     path("notifications/", include("apps.notifications.urls")),
     path("announcements/", include("apps.announcements.urls")),
+    path("transport/", include("apps.transport.urls")),
     path("settings/", include("apps.system_settings.urls")),
     path("reports/", include("apps.reports.urls")),
     path("selfservice/", include("apps.selfservice.urls")),

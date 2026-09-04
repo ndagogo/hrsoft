@@ -46,6 +46,12 @@ ENTERPRISE_PERMISSIONS = [
     ("approve_announcement", "Approve announcements", Cat.ANNOUNCEMENTS, "Approve or reject pending company announcements."),
     ("view_organization", "View organization", Cat.ORGANIZATION, "View companies, regions, branches and units."),
     ("manage_organization", "Manage organization", Cat.ORGANIZATION, "Create, update and delete companies, regions, branches and units."),
+    ("view_transport", "View transport", Cat.TRANSPORT, "View fleet vehicles, drivers and rides."),
+    ("manage_transport", "Manage transport", Cat.TRANSPORT, "Manage fleet, drivers, policies and all rides."),
+    ("create_ride", "Request rides", Cat.TRANSPORT, "Create and submit transportation ride requests."),
+    ("approve_transport", "Approve transport rides", Cat.TRANSPORT, "Approve or reject ride requests and carpool joins."),
+    ("accept_driver_assignment", "Accept driver assignments", Cat.TRANSPORT, "Drivers can accept or decline assigned rides."),
+    ("view_live_tracking", "View live tracking", Cat.TRANSPORT, "View live vehicle GPS and journey maps (Phase 4)."),
 ]
 
 CORE_ROLES = {
@@ -70,13 +76,14 @@ CORE_ROLES = {
             "view_employee_documentation",
             "view_visitors", "import_data",
             "create_announcement", "approve_announcement",
+            "view_transport", "approve_transport", "create_ride",
         ],
     },
     "Department Manager": {
         "description": "Oversees their department's team, attendance and leave approvals.",
         "dashboard_key": "manager",
         "color": "#14b8a6",
-        "permissions": ["view_employees", "view_attendance", "approve_leave", "view_reports"],
+        "permissions": ["view_employees", "view_attendance", "approve_leave", "view_reports", "create_ride", "approve_transport"],
     },
     "General Manager": {
         "description": "Final operational authority — final leave approvals and executive oversight.",
@@ -85,6 +92,7 @@ CORE_ROLES = {
         "permissions": [
             "view_employees", "view_attendance", "view_payroll", "view_reports", "export_reports",
             "approve_leave", "approve_leave_gm", "approve_announcement", "create_announcement",
+            "view_transport", "approve_transport",
         ],
     },
     "Payroll Officer": {
@@ -97,7 +105,7 @@ CORE_ROLES = {
         "description": "Standard staff access: own attendance, leave and payslips.",
         "dashboard_key": "employee",
         "color": "#324269",
-        "permissions": [],
+        "permissions": ["create_ride"],
     },
 }
 
@@ -117,13 +125,13 @@ ENTERPRISE_ROLES = {
         "description": "Leads a department — attendance, leave and team performance.",
         "dashboard_key": "manager",
         "color": "#0ea5e9",
-        "permissions": ["view_employees", "view_attendance", "approve_leave", "view_performance", "view_reports"],
+        "permissions": ["view_employees", "view_attendance", "approve_leave", "view_performance", "view_reports", "create_ride", "approve_transport"],
     },
     "Supervisor": {
         "description": "Supervises a team subset with leave approval rights.",
         "dashboard_key": "manager",
         "color": "#06b6d4",
-        "permissions": ["view_employees", "view_attendance", "approve_leave"],
+        "permissions": ["view_employees", "view_attendance", "approve_leave", "create_ride"],
     },
     "Reception": {
         "description": "Front desk — visitor management and appointments.",
@@ -145,6 +153,21 @@ ENTERPRISE_ROLES = {
             "manage_devices", "manage_system_settings", "view_employees",
             "view_assets", "manage_assets", "view_attendance",
         ],
+    },
+    "Transport Officer": {
+        "description": "Fleet operations — vehicles, drivers, ride approvals and carpool joins.",
+        "dashboard_key": "admin",
+        "color": "#ea580c",
+        "permissions": [
+            "view_transport", "manage_transport", "create_ride", "approve_transport",
+            "accept_driver_assignment", "view_live_tracking", "view_employees",
+        ],
+    },
+    "Driver": {
+        "description": "Assigned vehicle journeys only — driver portal.",
+        "dashboard_key": "employee",
+        "color": "#0891b2",
+        "permissions": ["create_ride", "accept_driver_assignment", "view_transport"],
     },
 }
 
