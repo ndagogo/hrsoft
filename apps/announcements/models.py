@@ -25,13 +25,36 @@ class AudienceType(models.TextChoices):
     CADRE = "cadre", "Selected cadre(s)"
 
 
+def _employee_profile_or_none(user):
+    """Reverse OneToOne raises if the HR profile is missing — never use getattr()."""
+    try:
+        return user.employee_profile
+    except Exception:
+        return None
+
+
+def _can_manage_announcements(user):
+    if not user or not user.is_authenticated:
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    role = getattr(user, "role", None)
+    if role and role.name in {"Admin", "HR Manager", "HR Officer", "General Manager"}:
+        return True
+    from apps.core.permissions import user_has_permission
+    return user_has_permission(user, "create_announcement") or user_has_permission(
+        user, "approve_announcement"
+    )
+
+
 class AnnouncementQuerySet(models.QuerySet):
     def published(self):
         now = timezone.now()
         return self.filter(
             status=AnnouncementStatus.APPROVED,
             is_active=True,
-            published_at__lte=now,
+        ).filter(
+            Q(published_at__isnull=True) | Q(published_at__lte=now)
         ).filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
 
     def visible_to(self, user):
@@ -39,11 +62,12 @@ class AnnouncementQuerySet(models.QuerySet):
         qs = self.published()
         if not user or not user.is_authenticated:
             return qs.none()
-        if getattr(user, "is_superuser", False):
+        # Creators/approvers need the full feed; audience targeting is for staff inbox.
+        if _can_manage_announcements(user):
             return qs
 
-        profile = getattr(user, "employee_profile", None)
-        audience_q = Q(audience_type=AudienceType.ALL)
+        profile = _employee_profile_or_none(user)
+        audience_q = Q(audience_type=AudienceType.ALL) | Q(audience_type="") | Q(author=user)
         if profile is not None:
             if profile.department_id:
                 audience_q |= Q(
@@ -135,7 +159,7 @@ class Announcement(models.Model):
     def is_published(self):
         if self.status != AnnouncementStatus.APPROVED or not self.is_active:
             return False
-        if not self.published_at or self.published_at > timezone.now():
+        if self.published_at and self.published_at > timezone.now():
             return False
         if self.expires_at and self.expires_at < timezone.now():
             return False
@@ -162,12 +186,14 @@ class Announcement(models.Model):
             return False
         if not user or not user.is_authenticated:
             return False
-        if getattr(user, "is_superuser", False):
+        if _can_manage_announcements(user):
             return True
-        if self.audience_type == AudienceType.ALL:
+        if self.author_id == getattr(user, "id", None):
+            return True
+        if self.audience_type in (AudienceType.ALL, "", None):
             return True
 
-        profile = getattr(user, "employee_profile", None)
+        profile = _employee_profile_or_none(user)
         if profile is None:
             return False
 

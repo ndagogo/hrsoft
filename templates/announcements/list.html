@@ -31,9 +31,11 @@
     {% if a.attachments.all %}
     <div class="d-flex flex-wrap gap-2 mb-2">
       {% for att in a.attachments.all %}
+        {% if att.file %}
         <a href="{{ att.file.url }}" class="btn btn-sm btn-light" target="_blank" rel="noopener">
           <i class="bi {% if att.is_image %}bi-image{% else %}bi-paperclip{% endif %} me-1"></i>{{ att.original_name|default:att.file.name|truncatechars:28 }}
         </a>
+        {% endif %}
       {% endfor %}
     </div>
     {% endif %}

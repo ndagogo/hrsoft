@@ -38,6 +38,7 @@
     <div class="row g-3">
       {% for att in announcement.attachments.all %}
       <div class="col-md-4">
+        {% if att.file %}
         {% if att.is_image %}
         <a href="{{ att.file.url }}" target="_blank" rel="noopener" class="d-block">
           <img src="{{ att.file.url }}" alt="{{ att.original_name }}" class="img-fluid rounded border" style="max-height:180px; object-fit:cover; width:100%;">
@@ -46,6 +47,7 @@
         <a href="{{ att.file.url }}" class="btn btn-light w-100 text-start" target="_blank" rel="noopener">
           <i class="bi bi-paperclip me-1"></i>{{ att.original_name|default:att.file.name }}
         </a>
+        {% endif %}
         {% endif %}
       </div>
       {% endfor %}
