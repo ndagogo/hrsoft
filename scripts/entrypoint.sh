@@ -245,6 +245,14 @@ python manage.py bootstrap_system
 
 
 # =============================================================================
+# Media directory (Railway volume should be mounted at DJANGO_MEDIA_ROOT)
+# =============================================================================
+
+MEDIA_ROOT="${DJANGO_MEDIA_ROOT:-/app/media}"
+echo "[entrypoint] Ensuring media directory exists: ${MEDIA_ROOT}"
+mkdir -p "${MEDIA_ROOT}"
+
+# =============================================================================
 # Static files
 # =============================================================================
 

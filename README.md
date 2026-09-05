@@ -333,6 +333,10 @@ python manage.py check --deploy
 - Install `deploy/hrms.service.example` as a systemd unit
 - Point nginx at Gunicorn using `deploy/nginx.ssl.conf.example`
 - Set `DJANGO_SERVE_MEDIA=False` when nginx serves `/media/`
+- On **Railway** (no nginx): keep `DJANGO_SERVE_MEDIA=True`, set
+  `DJANGO_MEDIA_ROOT=/app/media`, and attach a persistent volume mounted at
+  `/app/media`. Without the volume, uploads disappear on redeploy and
+  `/media/...` returns the branded 404 page.
 
 ### Hardening already enabled when `DJANGO_DEBUG=False`
 
