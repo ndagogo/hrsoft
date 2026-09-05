@@ -91,7 +91,12 @@ def test_device_connection_view(request, pk):
     ok, message = test_device_connection(device)
     device.last_sync_message = message[:255]
     device.last_sync_status = "ok" if ok else "error"
-    device.save(update_fields=["last_sync_message", "last_sync_status"])
+    update_fields = ["last_sync_message", "last_sync_status"]
+    if ok:
+        from django.utils import timezone
+        device.last_seen_at = timezone.now()
+        update_fields.append("last_seen_at")
+    device.save(update_fields=update_fields)
     if ok:
         messages.success(request, message)
     else:

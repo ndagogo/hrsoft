@@ -567,6 +567,8 @@ def manage_status(request, pk):
                 "port": device.port,
                 "serial_number": device.serial_number,
                 "is_active": device.is_active,
+                "is_online": device.is_online,
+                "connection_status": device.connection_status,
                 "last_sync_at": device.last_sync_at.isoformat() if device.last_sync_at else None,
                 "last_seen_at": device.last_seen_at.isoformat() if device.last_seen_at else None,
                 "last_sync_status": device.last_sync_status,

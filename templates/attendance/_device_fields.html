@@ -1,10 +1,11 @@
 {% comment %}
-Shared fields for BiometricDeviceForm.
+Shared fields for BiometricDeviceForm (supports form prefixes).
 {% endcomment %}
 <div class="row g-3">
   <div class="col-md-6">
     <label class="form-label small fw-semibold">Device name</label>
     {{ form.name }}
+    {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors|striptags }}</div>{% endif %}
   </div>
   <div class="col-md-6">
     <label class="form-label small fw-semibold">Brand</label>
@@ -21,6 +22,7 @@ Shared fields for BiometricDeviceForm.
   <div class="col-md-8">
     <label class="form-label small fw-semibold">IP address</label>
     {{ form.ip_address }}
+    {% if form.ip_address.errors %}<div class="text-danger small">{{ form.ip_address.errors|striptags }}</div>{% endif %}
     <div class="form-text">Use the static IP from the device Ethernet screen (DHCP Off).</div>
   </div>
   <div class="col-md-4">
@@ -50,34 +52,37 @@ Shared fields for BiometricDeviceForm.
     {{ form.webhook_token }}
   </div>
   <div class="col-md-12 d-flex align-items-center gap-2 pt-2">
-    {{ form.is_active }} <label class="form-check-label small">Device is active</label>
+    {{ form.is_active }} <label class="form-check-label small" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
   </div>
+  {% if form.is_active.help_text %}
+  <div class="col-12"><div class="form-text">{{ form.is_active.help_text }}</div></div>
+  {% endif %}
 </div>
 <div class="alert alert-info mt-3 mb-0" style="font-size:0.78rem;">
   <i class="bi bi-info-circle me-1"></i>
   <strong>Quick setup:</strong>
   1) Brand = ZKTeco · IP = <code>192.168.1.201</code> · Port = <code>4370</code> · DHCP Off on the terminal.
-  2) Use <strong>Test</strong> then <strong>Sync now</strong> to pull punches.
+  2) Use <strong>Test</strong> then <strong>Pull punches</strong> to sync.
   3) Link each device User ID to an employee below (or set <em>ZKTeco User ID</em> on the employee profile).
 </div>
 <script>
 (function(){
   function toggleBrandFields(root){
-    const brand = root.querySelector('[name="brand"]');
+    const brand = root.querySelector('select[name$="-brand"], select[name="brand"]');
     if(!brand) return;
     const isZk = brand.value === 'zkteco';
     root.querySelectorAll('.device-field-zk').forEach(el => el.style.display = isZk ? '' : 'none');
     root.querySelectorAll('.device-field-hik').forEach(el => el.style.display = isZk ? 'none' : '');
-    const port = root.querySelector('[name="port"]');
+    const port = root.querySelector('input[name$="-port"], input[name="port"]');
     if(port && !port.dataset.touched){
       if(isZk && (!port.value || port.value === '80')) port.value = '4370';
       if(!isZk && (!port.value || port.value === '4370')) port.value = '80';
     }
   }
   document.querySelectorAll('form').forEach(function(form){
-    const brand = form.querySelector('[name="brand"]');
+    const brand = form.querySelector('select[name$="-brand"], select[name="brand"]');
     if(!brand) return;
-    const port = form.querySelector('[name="port"]');
+    const port = form.querySelector('input[name$="-port"], input[name="port"]');
     if(port) port.addEventListener('input', () => port.dataset.touched = '1');
     brand.addEventListener('change', () => toggleBrandFields(form));
     toggleBrandFields(form);

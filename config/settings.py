@@ -309,6 +309,8 @@ BIOMETRIC_SETTINGS = {
     "ZK_OMIT_PING": os.environ.get("ZK_OMIT_PING", "True").strip().lower() in {"1", "true", "yes", "on"},
     "ZK_DEFAULT_IP": os.environ.get("ZK_DEFAULT_IP", "192.168.1.201"),
     "ZK_DEFAULT_PORT": int(os.environ.get("ZK_DEFAULT_PORT", 4370)),
+    # Device shows Online only if last_seen_at is within this window
+    "ONLINE_THRESHOLD_MINUTES": int(os.environ.get("BIOMETRIC_ONLINE_THRESHOLD_MINUTES", 10)),
     "LATE_GRACE_MINUTES": 10,
     "DEFAULT_WORKDAY_START": "09:00",
     "DEFAULT_WORKDAY_END": "17:00",

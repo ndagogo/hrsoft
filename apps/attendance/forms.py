@@ -12,7 +12,7 @@ class BiometricDeviceForm(forms.ModelForm):
         ]
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. Main Gate Terminal"}),
-            "brand": forms.Select(attrs={"class": "form-select", "id": "id_brand"}),
+            "brand": forms.Select(attrs={"class": "form-select"}),
             "connection_mode": forms.Select(attrs={"class": "form-select"}),
             "ip_address": forms.TextInput(attrs={
                 "class": "form-control",
@@ -29,6 +29,12 @@ class BiometricDeviceForm(forms.ModelForm):
                 "placeholder": "API Bearer token — auto-generated if blank",
             }),
             "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+        labels = {
+            "is_active": "Enabled for polling / auth",
+        }
+        help_texts = {
+            "is_active": "Turn off to stop sync and device API auth. Online/Offline is based on live communication.",
         }
 
     def __init__(self, *args, **kwargs):

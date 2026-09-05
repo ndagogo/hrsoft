@@ -21,12 +21,15 @@
           <h5 class="font-display fw-semibold mb-0">{{ device.name }}</h5>
           <div class="text-secondary" style="font-size:0.78rem;">{{ device.location|default:"No location set" }}</div>
         </div>
-        {% if device.is_active %}
-          <span class="status-pill status-present">Active</span>
+        {% if device.is_online %}
+          <span class="status-pill status-present" title="Communicated within the last {{ device.online_window_label }}">Online</span>
         {% else %}
-          <span class="status-pill status-cancelled">Disabled</span>
+          <span class="status-pill status-cancelled" title="No recent heartbeat, punch, or successful sync">Offline</span>
         {% endif %}
       </div>
+      {% if not device.is_active %}
+      <div class="mb-2"><span class="chip text-secondary">Disabled for polling</span></div>
+      {% endif %}
 
       <div style="font-size:0.83rem;">
         <div class="d-flex justify-content-between py-1"><span class="text-secondary">Brand</span><span class="fw-semibold">{{ device.get_brand_display }}</span></div>
@@ -103,7 +106,7 @@
           {% csrf_token %}
           <div class="modal-header"><h5 class="modal-title font-display">Edit {{ device.name }}</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
           <div class="modal-body">
-            {% include "attendance/_device_fields.html" with form=form device=device %}
+            {% include "attendance/_device_fields.html" with form=device.edit_form %}
           </div>
           <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-amber">Save changes</button></div>
         </form>

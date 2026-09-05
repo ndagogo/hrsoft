@@ -1,5 +1,8 @@
-from django.db import models
+from datetime import timedelta
+
 from django.conf import settings
+from django.db import models
+from django.utils import timezone
 
 
 class DeviceBrand(models.TextChoices):
@@ -56,7 +59,10 @@ class BiometricDevice(models.Model):
         help_text="Per-device API / webhook secret. Used as Bearer token for remote push.",
     )
 
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(
+        default=True,
+        help_text="When False, polling and device auth are disabled. Does not mean online.",
+    )
     last_sync_at = models.DateTimeField(null=True, blank=True)
     last_sync_status = models.CharField(max_length=20, blank=True, help_text="ok / error / never")
     last_sync_message = models.CharField(max_length=255, blank=True)
@@ -83,6 +89,33 @@ class BiometricDevice(models.Model):
         if self.ip_address:
             return f"{self.ip_address}:{self.port}"
         return self.serial_number or "remote"
+
+    @staticmethod
+    def online_threshold() -> timedelta:
+        cfg = getattr(settings, "BIOMETRIC_SETTINGS", {}) or {}
+        minutes = int(cfg.get("ONLINE_THRESHOLD_MINUTES", 10))
+        return timedelta(minutes=max(1, minutes))
+
+    @property
+    def is_online(self) -> bool:
+        """True only when the device recently communicated (heartbeat, punch, or successful sync)."""
+        if not self.last_seen_at:
+            return False
+        return timezone.now() - self.last_seen_at <= self.online_threshold()
+
+    @property
+    def connection_status(self) -> str:
+        """UI label: online | offline."""
+        return "online" if self.is_online else "offline"
+
+    @property
+    def connection_status_display(self) -> str:
+        return "Online" if self.is_online else "Offline"
+
+    @property
+    def online_window_label(self) -> str:
+        minutes = int(self.online_threshold().total_seconds() // 60)
+        return f"{minutes} min"
 
 
 class PunchDirection(models.TextChoices):

@@ -198,7 +198,9 @@ def attendance_override(request, pk):
 @login_required
 @permission_required("manage_devices")
 def device_list(request):
-    devices = BiometricDevice.objects.all()
+    devices = list(BiometricDevice.objects.all())
+    for device in devices:
+        device.edit_form = BiometricDeviceForm(instance=device, prefix=f"device_{device.pk}")
     recent_logs = RawPunchLog.objects.select_related("device", "employee__user").order_by("-timestamp")[:25]
     unmatched_ids = list(
         RawPunchLog.objects.filter(matched=False)
@@ -206,7 +208,7 @@ def device_list(request):
         .values_list("device_employee_no", flat=True)
         .distinct()[:40]
     )
-    form = BiometricDeviceForm()
+    form = BiometricDeviceForm(prefix="new")
     return render(request, "attendance/devices.html", {
         "devices": devices,
         "recent_logs": recent_logs,
@@ -267,7 +269,7 @@ def link_biometric_id(request):
 @permission_required("manage_devices")
 def device_create(request):
     if request.method == "POST":
-        form = BiometricDeviceForm(request.POST)
+        form = BiometricDeviceForm(request.POST, prefix="new")
         if form.is_valid():
             device = form.save(commit=False)
             if not device.webhook_token:
@@ -275,7 +277,7 @@ def device_create(request):
             device.save()
             messages.success(request, f"Device '{device.name}' registered. Webhook token: {device.webhook_token}")
         else:
-            messages.error(request, "Please fix the errors below.")
+            messages.error(request, "Could not register device. Check required fields (name, IP for pull mode).")
     return redirect("attendance:devices")
 
 
@@ -283,13 +285,16 @@ def device_create(request):
 @permission_required("manage_devices")
 def device_edit(request, pk):
     device = get_object_or_404(BiometricDevice, pk=pk)
+    prefix = f"device_{pk}"
     if request.method == "POST":
-        form = BiometricDeviceForm(request.POST, instance=device)
+        form = BiometricDeviceForm(request.POST, instance=device, prefix=prefix)
         if form.is_valid():
             form.save()
             messages.success(request, "Device updated.")
         else:
-            messages.error(request, "Please fix the errors below.")
+            # Surface the first field error so blank/default overwrites are obvious
+            first_error = next(iter(form.errors.values()), ["Invalid data."])[0]
+            messages.error(request, f"Could not update device: {first_error}")
     return redirect("attendance:devices")
 
 
