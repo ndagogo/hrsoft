@@ -84,6 +84,32 @@ class UserCreateForm(forms.ModelForm):
             raise ValidationError("Passwords don't match.")
         return cleaned
 
+    def clean_email(self):
+        from apps.employees.conflicts import find_staff_conflicts, normalize_email
+
+        email = normalize_email(self.cleaned_data.get("email"))
+        match = find_staff_conflicts(
+            email=email,
+            check_open_invite=False,
+            check_blocking_invite=True,
+        )
+        if match and match.matched_by in ("email", "email (invite already submitted)"):
+            raise ValidationError(match.message)
+        return email
+
+    def clean_username(self):
+        from apps.employees.conflicts import find_staff_conflicts
+
+        username = (self.cleaned_data.get("username") or "").strip()
+        match = find_staff_conflicts(
+            username=username,
+            check_open_invite=False,
+            check_blocking_invite=False,
+        )
+        if match and match.matched_by == "username":
+            raise ValidationError(match.message)
+        return username
+
     def save(self, commit=True):
         user = super().save(commit=False)
         user.set_password(self.cleaned_data["password1"])

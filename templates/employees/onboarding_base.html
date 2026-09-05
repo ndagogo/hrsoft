@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Staff onboarding{% endblock %} · {{ COMPANY_NAME|default:"HRMS" }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    :root { --ink:#0f2744; --amber:#f5a524; --sand:#f3f6f9; }
+    body { background: linear-gradient(165deg, #e8f0f5 0%, #f8fafc 45%, #fff8ef 100%); min-height:100vh; color:var(--ink); font-family: "Segoe UI", system-ui, sans-serif; }
+    .onboard-nav { background: rgba(15,39,68,.94); }
+    .onboard-card { background:#fff; border:1px solid rgba(15,39,68,.08); border-radius:14px; padding:1.75rem; box-shadow:0 10px 30px rgba(15,39,68,.06); }
+    .btn-amber { background:var(--amber); border:none; color:#0f2744; font-weight:600; }
+    .btn-amber:hover { background:#e0941c; color:#0f2744; }
+  </style>
+</head>
+<body>
+  <nav class="onboard-nav py-3">
+    <div class="container">
+      <span class="text-white fw-semibold"><i class="bi bi-person-badge me-2"></i>{{ COMPANY_NAME|default:"HRMS" }} — Staff onboarding</span>
+    </div>
+  </nav>
+  <main class="container py-4" style="max-width:720px;">
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

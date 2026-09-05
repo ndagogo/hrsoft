@@ -4,6 +4,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 from apps.core.views import healthz
+from apps.employees.views import invite_onboard
 
 urlpatterns = [
     path("healthz/", healthz, name="healthz"),
@@ -13,6 +14,7 @@ urlpatterns = [
     path("rbac/", include("apps.rbac.urls")),
     path("organization/", include("apps.organization.urls")),
     path("employees/", include("apps.employees.urls")),
+    path("onboarding/invite/<str:token>/", invite_onboard, name="invite_onboard"),
     path("attendance/", include("apps.attendance.urls")),
     path("leave/", include("apps.leave.urls")),
     path("payroll/", include("apps.payroll.urls")),

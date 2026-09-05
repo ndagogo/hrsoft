@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Invite employee{% endblock %}
+{% block page_title %}Invite via email{% endblock %}
+{% block page_subtitle %}Send a self-onboarding link{% endblock %}
+
+{% block content %}
+<div class="surface-card" style="max-width:720px;">
+  <div class="surface-card-body">
+    {% include "employees/_invite_modal_body.html" %}
+  </div>
+</div>
+{% endblock %}

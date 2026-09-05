@@ -1,0 +1,84 @@
+{% extends "employees/onboarding_base.html" %}
+{% block title %}Complete your profile{% endblock %}
+
+{% block content %}
+<div class="onboard-card">
+  <h1 class="h4 fw-semibold mb-1">Welcome — complete your profile</h1>
+  <p class="text-secondary mb-4">
+    Invited as <strong>{{ invite.email }}</strong>.
+    {% if invite.department %} Department: {{ invite.department.name }}.{% endif %}
+    Your account stays inactive until HR admits you.
+  </p>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+    <div class="alert alert-danger">{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div>
+    {% endif %}
+
+    <h2 class="h6 text-uppercase text-secondary mb-3" style="letter-spacing:.04em;">Account</h2>
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">First name</label>
+        {{ form.first_name }}
+        {% for e in form.first_name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Last name</label>
+        {{ form.last_name }}
+        {% for e in form.last_name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Username</label>
+        {{ form.username }}
+        <div class="form-text">{{ form.username.help_text }}</div>
+        {% for e in form.username.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Phone</label>
+        {{ form.phone_number }}
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Password</label>
+        {{ form.password1 }}
+        {% for e in form.password1.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Confirm password</label>
+        {{ form.password2 }}
+        {% for e in form.password2.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+      </div>
+    </div>
+
+    <h2 class="h6 text-uppercase text-secondary mb-3" style="letter-spacing:.04em;">Personal</h2>
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Gender</label>
+        {{ form.gender }}
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Date of birth</label>
+        {{ form.date_of_birth }}
+      </div>
+      <div class="col-12">
+        <label class="form-label small fw-semibold">Address</label>
+        {{ form.address }}
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Emergency contact name</label>
+        {{ form.emergency_contact_name }}
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Emergency contact phone</label>
+        {{ form.emergency_contact_phone }}
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Biometric device ID (optional)</label>
+        {{ form.biometric_id }}
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-amber w-100 py-2">Submit for HR admission</button>
+  </form>
+</div>
+{% endblock %}

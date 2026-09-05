@@ -1,0 +1,43 @@
+<form method="post" action="{% url 'employees:invite' %}">
+  {% csrf_token %}
+  <p class="text-secondary small mb-3">Send a one-time onboarding link. The invitee fills in their details, then you Admit Staff before they can sign in.</p>
+  <div class="row g-3 mb-3">
+    <div class="col-md-12">
+      <label class="form-label small fw-semibold">Email <span class="text-danger">*</span></label>
+      {{ form.email }}
+      {% for e in form.email.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Role (optional)</label>
+      {{ form.role }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Employment type</label>
+      {{ form.employment_type }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Department</label>
+      {{ form.department }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Designation</label>
+      {{ form.designation }}
+    </div>
+    <div class="col-md-12">
+      <label class="form-label small fw-semibold">Branches</label>
+      {{ form.branches }}
+      <div class="form-text">{{ form.branches.help_text }}</div>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">Manager</label>
+      {{ form.manager }}
+    </div>
+  </div>
+  {% if form.non_field_errors %}
+  <div class="alert alert-danger">{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div>
+  {% endif %}
+  <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+    <button type="submit" class="btn btn-amber"><i class="bi bi-envelope-plus me-1"></i>Send invite</button>
+  </div>
+</form>

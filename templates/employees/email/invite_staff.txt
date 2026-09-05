@@ -1,0 +1,10 @@
+You're invited to join {{ company_name }}.
+
+Complete your staff onboarding using this secure link:
+{{ onboard_url }}
+
+This link expires on {{ expires_at|date:"M d, Y H:i" }}.
+
+After you submit, HR must admit you before you can sign in.
+
+If you weren't expecting this email, you can ignore it.

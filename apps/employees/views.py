@@ -5,12 +5,21 @@ from django.db.models import Q
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.template.loader import render_to_string
+from django.views.decorators.http import require_POST
 
 from apps.core.permissions import permission_required
 from apps.accounts.forms import UserCreateForm, UserEditForm
 from apps.assets.services import employee_active_assignments
-from .models import Employee, Department, Designation
-from .forms import EmployeeForm, DepartmentForm, DesignationForm
+from .models import Employee, Department, Designation, EmployeeInvite, InviteStatus, EmploymentStatus
+from .forms import EmployeeForm, DepartmentForm, DesignationForm, EmployeeInviteForm, SelfOnboardForm
+from .conflicts import StaffConflictError, cancel_open_invites_for_email
+from .invites import (
+    admit_staff,
+    complete_self_onboard,
+    create_and_send_invite,
+    get_valid_pending_invite,
+    reject_staff,
+)
 from .import_export import (
     IMPORT_DEFAULT_PASSWORD,
     export_employees_response,
@@ -65,6 +74,11 @@ def employee_list(request):
     if not org_wide and profile and profile.department:
         scope_label = profile.department.name
 
+    pending_admissions = 0
+    from apps.core.permissions import user_has_permission
+    if user_has_permission(request.user, "manage_employees"):
+        pending_admissions = EmployeeInvite.objects.filter(status=InviteStatus.SUBMITTED).count()
+
     context = {
         "page_obj": page_obj,
         "departments": departments,
@@ -74,6 +88,7 @@ def employee_list(request):
         "total_count": qs.count(),
         "org_wide_directory": org_wide,
         "scope_label": scope_label,
+        "pending_admissions": pending_admissions,
     }
     return render(request, "employees/list.html", context)
 
@@ -120,6 +135,10 @@ def employee_create(request):
             employee.employee_id = generate_employee_id()
             employee.save()
             employee_form.save_m2m()
+            cancel_open_invites_for_email(
+                user.email,
+                reason="Cancelled after direct employee create.",
+            )
             messages.success(request, f"{user.get_full_name()} was added as a new employee.")
             return redirect("employees:list")
         else:
@@ -223,6 +242,136 @@ def employee_import_template(request):
     if fmt not in ("csv", "xlsx"):
         fmt = "csv"
     return import_template_response(fmt)
+
+
+# --- Invites & admissions --------------------------------------------------
+
+@login_required
+@permission_required("manage_employees")
+def employee_invite(request):
+    if request.method == "POST":
+        form = EmployeeInviteForm(request.POST)
+        if form.is_valid():
+            try:
+                invite = create_and_send_invite(
+                    request,
+                    email=form.cleaned_data["email"],
+                    role=form.cleaned_data.get("role"),
+                    department=form.cleaned_data.get("department"),
+                    designation=form.cleaned_data.get("designation"),
+                    branches=form.cleaned_data.get("branches"),
+                    employment_type=form.cleaned_data.get("employment_type"),
+                    manager=form.cleaned_data.get("manager"),
+                )
+                messages.success(
+                    request,
+                    f"Invite sent to {invite.email}. They must complete onboarding before you can Admit Staff.",
+                )
+                return redirect("employees:list")
+            except StaffConflictError as exc:
+                messages.error(request, exc.messages[0] if exc.messages else str(exc))
+            except Exception as exc:
+                messages.error(request, f"Could not send invite: {exc}")
+        else:
+            messages.error(request, "Please fix the errors below.")
+    else:
+        form = EmployeeInviteForm()
+
+    html = render_to_string("employees/_invite_modal_body.html", {"form": form}, request=request)
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.GET.get("modal"):
+        return JsonResponse({"html": html, "success": False})
+    return render(request, "employees/invite_page.html", {"form": form})
+
+
+@login_required
+@permission_required("manage_employees")
+def admissions_queue(request):
+    invites = (
+        EmployeeInvite.objects.filter(
+            status__in=[InviteStatus.SUBMITTED, InviteStatus.CONFLICT, InviteStatus.PENDING]
+        )
+        .select_related("user", "employee", "department", "designation", "role", "invited_by")
+        .prefetch_related("branches")
+        .order_by("-submitted_at", "-created_at")
+    )
+    submitted = [i for i in invites if i.status == InviteStatus.SUBMITTED]
+    conflicts = [i for i in invites if i.status == InviteStatus.CONFLICT]
+    pending = [i for i in invites if i.status == InviteStatus.PENDING]
+    pending_employees = Employee.objects.filter(
+        status=EmploymentStatus.PENDING_ADMISSION
+    ).select_related("user", "department", "designation")
+    return render(request, "employees/admissions.html", {
+        "submitted_invites": submitted,
+        "conflict_invites": conflicts,
+        "pending_invites": pending,
+        "pending_employees": pending_employees,
+    })
+
+
+@login_required
+@permission_required("manage_employees")
+@require_POST
+def admit_invite(request, pk):
+    invite = get_object_or_404(EmployeeInvite, pk=pk)
+    try:
+        employee = admit_staff(invite)
+        messages.success(request, f"{employee.full_name} has been admitted and can now sign in.")
+    except StaffConflictError as exc:
+        messages.error(request, exc.messages[0] if exc.messages else str(exc))
+    return redirect("employees:admissions")
+
+
+@login_required
+@permission_required("manage_employees")
+@require_POST
+def reject_invite(request, pk):
+    invite = get_object_or_404(EmployeeInvite, pk=pk)
+    reject_staff(invite, reason=request.POST.get("reason", "Rejected by HR."))
+    messages.success(request, f"Invite for {invite.email} was rejected.")
+    return redirect("employees:admissions")
+
+
+def invite_onboard(request, token):
+    """Public self-onboarding form for an invite token."""
+    invite = get_valid_pending_invite(token)
+    if not invite:
+        return render(request, "employees/onboarding_invalid.html", {
+            "reason": "not_found",
+        }, status=404)
+
+    if invite.status == InviteStatus.EXPIRED:
+        return render(request, "employees/onboarding_invalid.html", {"reason": "expired"})
+    if invite.status == InviteStatus.SUBMITTED:
+        return render(request, "employees/onboarding_invalid.html", {"reason": "already_submitted"})
+    if invite.status == InviteStatus.ADMITTED:
+        return render(request, "employees/onboarding_invalid.html", {"reason": "admitted"})
+    if invite.status == InviteStatus.CANCELLED:
+        return render(request, "employees/onboarding_invalid.html", {"reason": "cancelled"})
+    if invite.status == InviteStatus.CONFLICT:
+        return render(request, "employees/onboarding_invalid.html", {
+            "reason": "conflict",
+            "conflict_reason": invite.conflict_reason,
+        })
+    if invite.status != InviteStatus.PENDING:
+        return render(request, "employees/onboarding_invalid.html", {"reason": "invalid"})
+
+    if request.method == "POST":
+        form = SelfOnboardForm(request.POST, invite=invite)
+        if form.is_valid():
+            try:
+                complete_self_onboard(invite, form.cleaned_data)
+                return render(request, "employees/onboarding_thanks.html", {"invite": invite})
+            except StaffConflictError as exc:
+                messages.error(request, exc.messages[0] if exc.messages else str(exc))
+        else:
+            messages.error(request, "Please fix the errors below.")
+    else:
+        form = SelfOnboardForm(invite=invite)
+
+    return render(request, "employees/onboarding_invite.html", {
+        "invite": invite,
+        "form": form,
+    })
 
 
 # --- Departments -----------------------------------------------------------

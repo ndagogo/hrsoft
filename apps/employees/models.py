@@ -45,6 +45,16 @@ class EmploymentStatus(models.TextChoices):
     SUSPENDED = "suspended", "Suspended"
     TERMINATED = "terminated", "Terminated"
     RESIGNED = "resigned", "Resigned"
+    PENDING_ADMISSION = "pending_admission", "Pending admission"
+
+
+class InviteStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    SUBMITTED = "submitted", "Submitted"
+    ADMITTED = "admitted", "Admitted"
+    CANCELLED = "cancelled", "Cancelled"
+    EXPIRED = "expired", "Expired"
+    CONFLICT = "conflict", "Conflict"
 
 
 class EmploymentType(models.TextChoices):
@@ -239,3 +249,78 @@ class EmployeeTransfer(models.Model):
 
     class Meta:
         ordering = ["-effective_date"]
+
+
+class EmployeeInvite(models.Model):
+    """
+    Email invite for self-onboarding. Candidate completes a public form; HR
+    must Admit Staff before the account becomes active.
+    """
+    email = models.EmailField(db_index=True)
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    status = models.CharField(
+        max_length=20, choices=InviteStatus.choices, default=InviteStatus.PENDING, db_index=True
+    )
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sent_employee_invites",
+    )
+    role = models.ForeignKey(
+        "rbac.Role", on_delete=models.SET_NULL, null=True, blank=True, related_name="employee_invites"
+    )
+    department = models.ForeignKey(
+        Department, on_delete=models.SET_NULL, null=True, blank=True, related_name="employee_invites"
+    )
+    designation = models.ForeignKey(
+        Designation, on_delete=models.SET_NULL, null=True, blank=True, related_name="employee_invites"
+    )
+    branches = models.ManyToManyField(
+        "organization.Branch", blank=True, related_name="employee_invites"
+    )
+    employment_type = models.CharField(
+        max_length=20, choices=EmploymentType.choices, default=EmploymentType.FULL_TIME
+    )
+    manager = models.ForeignKey(
+        Employee,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="invited_reports",
+    )
+    expires_at = models.DateTimeField()
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="employee_invites",
+    )
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="invites",
+    )
+    submitted_payload = models.JSONField(default=dict, blank=True)
+    conflict_reason = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    admitted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Invite {self.email} ({self.status})"
+
+    @property
+    def is_expired(self):
+        from django.utils import timezone
+        return timezone.now() >= self.expires_at
+
+    def get_onboard_url(self):
+        return reverse("invite_onboard", args=[self.token])

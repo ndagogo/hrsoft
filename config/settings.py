@@ -197,6 +197,7 @@ PUBLIC_URLS = [
     "/api/v1/device/",
     "/admin/login/",
     "/recruitment/careers/",
+    "/onboarding/",
     "/healthz/",
 ]
 

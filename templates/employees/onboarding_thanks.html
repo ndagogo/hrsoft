@@ -1,0 +1,14 @@
+{% extends "employees/onboarding_base.html" %}
+{% block title %}Submitted{% endblock %}
+
+{% block content %}
+<div class="onboard-card text-center py-5">
+  <i class="bi bi-check-circle text-success" style="font-size:2.5rem;"></i>
+  <h1 class="h4 fw-semibold mt-3">Profile submitted</h1>
+  <p class="text-secondary mb-0" style="max-width:28rem;margin:0 auto;">
+    Thanks{% if invite.user %}, {{ invite.user.first_name }}{% endif %}.
+    HR will review your details and Admit Staff before you can sign in.
+    You will not be able to log in until that happens.
+  </p>
+</div>
+{% endblock %}

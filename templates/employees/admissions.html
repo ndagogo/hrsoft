@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Admit staff{% endblock %}
+{% block page_title %}Admit staff{% endblock %}
+{% block page_subtitle %}Review self-onboarded candidates before activation{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+  <div>
+    <h2 class="section-heading">Pending admissions</h2>
+    <p class="section-subtext mb-0">Admit activates the account; Reject cancels the invite and deactivates the user.</p>
+  </div>
+  <a href="{% url 'employees:list' %}" class="btn btn-light"><i class="bi bi-arrow-left me-1"></i> Directory</a>
+</div>
+
+{% if conflict_invites %}
+<div class="surface-card mb-4 border border-danger-subtle">
+  <div class="surface-card-body">
+    <h3 class="h6 fw-semibold text-danger mb-3"><i class="bi bi-exclamation-triangle me-1"></i> Conflicts</h3>
+    <div class="table-responsive">
+      <table class="table table-hrms mb-0">
+        <thead>
+          <tr><th>Email</th><th>Reason</th><th class="text-end">Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for inv in conflict_invites %}
+          <tr>
+            <td>{{ inv.email }}</td>
+            <td class="small text-secondary">{{ inv.conflict_reason|default:"Duplicate staff record" }}</td>
+            <td class="text-end">
+              <form method="post" action="{% url 'employees:reject' inv.pk %}" class="d-inline">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-light text-danger">Dismiss</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="surface-card mb-4">
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead>
+        <tr>
+          <th>Candidate</th>
+          <th>Email</th>
+          <th>Department</th>
+          <th>Submitted</th>
+          <th>Status</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inv in submitted_invites %}
+        <tr>
+          <td class="fw-semibold">{% if inv.user %}{{ inv.user.get_full_name }}{% else %}—{% endif %}</td>
+          <td>{{ inv.email }}</td>
+          <td>{{ inv.department.name|default:"—" }}</td>
+          <td>{{ inv.submitted_at|date:"M d, Y H:i"|default:"—" }}</td>
+          <td><span class="status-pill status-pending_admission">Awaiting admission</span></td>
+          <td class="text-end">
+            <form method="post" action="{% url 'employees:admit' inv.pk %}" class="d-inline">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-amber">Admit Staff</button>
+            </form>
+            <form method="post" action="{% url 'employees:reject' inv.pk %}" class="d-inline">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-light text-danger">Reject</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6"><div class="empty-state"><i class="bi bi-inbox"></i>No candidates awaiting admission.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if pending_invites %}
+<div class="surface-card">
+  <div class="surface-card-body border-bottom">
+    <h3 class="h6 fw-semibold mb-0">Open invites (not yet completed)</h3>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hrms mb-0">
+      <thead>
+        <tr><th>Email</th><th>Invited</th><th>Expires</th><th class="text-end">Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for inv in pending_invites %}
+        <tr>
+          <td>{{ inv.email }}</td>
+          <td>{{ inv.created_at|date:"M d, Y" }}</td>
+          <td>{{ inv.expires_at|date:"M d, Y" }}</td>
+          <td class="text-end">
+            <form method="post" action="{% url 'employees:reject' inv.pk %}" class="d-inline">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-light text-danger">Cancel invite</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
