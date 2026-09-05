@@ -157,7 +157,7 @@ def complete_self_onboard(invite: EmployeeInvite, cleaned_data: dict) -> Employe
         )
     except StaffConflictError as exc:
         invite.status = InviteStatus.CONFLICT
-        invite.conflict_reason = str(exc)[:255]
+        invite.conflict_reason = exc.match.message[:255]
         invite.save(update_fields=["status", "conflict_reason"])
         raise
 

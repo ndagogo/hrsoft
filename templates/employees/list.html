@@ -29,6 +29,12 @@
     <a href="{% url 'employees:import' %}" class="btn btn-light">
       <i class="bi bi-upload me-1"></i> Import
     </a>
+    <a href="{% url 'employees:admissions' %}" class="btn btn-light">
+      <i class="bi bi-person-check me-1"></i> Admit staff{% if pending_admissions %} <span class="badge text-bg-warning">{{ pending_admissions }}</span>{% endif %}
+    </a>
+    <button class="btn btn-light" data-modal-url="{% url 'employees:invite' %}?modal=1" data-modal-title="Invite via email">
+      <i class="bi bi-envelope-plus me-1"></i> Invite via email
+    </button>
     <button class="btn btn-amber" data-modal-url="{% url 'employees:create' %}?modal=1" data-modal-title="Add employee">
       <i class="bi bi-person-plus-fill me-1"></i> Add Employee
     </button>
@@ -72,6 +78,7 @@
         <select name="status" class="form-select">
           <option value="">Any status</option>
           <option value="active" {% if selected_status == "active" %}selected{% endif %}>Active</option>
+          <option value="pending_admission" {% if selected_status == "pending_admission" %}selected{% endif %}>Pending admission</option>
           <option value="on_leave" {% if selected_status == "on_leave" %}selected{% endif %}>On Leave</option>
           <option value="suspended" {% if selected_status == "suspended" %}selected{% endif %}>Suspended</option>
           <option value="terminated" {% if selected_status == "terminated" %}selected{% endif %}>Terminated</option>

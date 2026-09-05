@@ -1,0 +1,26 @@
+{% extends "employees/onboarding_base.html" %}
+{% block title %}Invite unavailable{% endblock %}
+
+{% block content %}
+<div class="onboard-card text-center py-5">
+  <i class="bi bi-link-45deg text-secondary" style="font-size:2.5rem;"></i>
+  <h1 class="h4 fw-semibold mt-3">This invite link isn’t available</h1>
+  <p class="text-secondary mb-0" style="max-width:28rem;margin:0 auto;">
+    {% if reason == "expired" %}
+      This invitation has expired. Please ask HR to send a new invite.
+    {% elif reason == "already_submitted" %}
+      You have already completed onboarding. Please wait for HR to admit you before signing in.
+    {% elif reason == "admitted" %}
+      This invitation was already admitted. You can sign in with the credentials you created.
+    {% elif reason == "cancelled" %}
+      This invitation was cancelled. Contact HR if you still need access.
+    {% elif reason == "conflict" %}
+      {{ conflict_reason|default:"A staff record already exists for this email. Contact HR." }}
+    {% elif reason == "not_found" %}
+      We couldn’t find this invitation. The link may be incorrect or revoked.
+    {% else %}
+      This invitation is no longer valid. Contact HR for help.
+    {% endif %}
+  </p>
+</div>
+{% endblock %}
