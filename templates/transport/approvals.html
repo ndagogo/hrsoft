@@ -18,8 +18,8 @@
           <td>{{ r.scheduled_departure|date:"M d, H:i" }}</td>
           <td>{{ r.get_current_stage_display|default:r.current_stage }}</td>
           <td class="text-end text-nowrap">
-            <form method="post" action="{% url 'transport:ride_review' r.pk 'approve' %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-amber">Approve</button></form>
-            <form method="post" action="{% url 'transport:ride_review' r.pk 'reject' %}" class="d-inline" data-confirm="Reject this ride?">{% csrf_token %}<button class="btn btn-sm btn-light text-danger">Reject</button></form>
+            <form method="post" action="{% url 'transport:ride_review' r.pk 'approve' %}" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-sm btn-amber">Approve</button></form>
+            <form method="post" action="{% url 'transport:ride_review' r.pk 'reject' %}" class="d-inline" data-confirm="Reject this ride?">{% csrf_token %}<button type="submit" class="btn btn-sm btn-light text-danger">Reject</button></form>
           </td>
         </tr>
       {% empty %}

@@ -51,6 +51,7 @@ class TransportationPolicyAdmin(admin.ModelAdmin):
         "require_manager_approval", "require_transport_approval", "require_driver_acceptance",
         "allow_carpooling", "max_route_deviation_percent",
         "geofence_radius_metres", "auto_start_enabled", "auto_arrival_enabled",
+        "auto_complete_enabled", "auto_start_max_accuracy_m", "auto_start_min_speed_kmh",
         "min_booking_notice_hours", "estimated_cost_per_km",
         "require_cancel_reason_after_approval",
     )

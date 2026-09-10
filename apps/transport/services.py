@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import transaction
 from django.db.models import Q
@@ -41,10 +42,113 @@ ACTIVE_RIDE_STATUSES = [
     RideStatus.IN_PROGRESS,
 ]
 
+JOINABLE_CARPOOL_STATUSES = [
+    RideStatus.APPROVED,
+    RideStatus.DRIVER_PENDING,
+    RideStatus.DRIVER_ACCEPTED,
+    RideStatus.READY,
+    RideStatus.PENDING_APPROVAL,
+]
+
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def round_distance_km(value):
+    """Store/display distance to 1 decimal place."""
+    if value is None:
+        return None
+    return Decimal(str(value)).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+
+
+def user_has_transport_ops_access(user) -> bool:
+    """Fleet ops / broad history: manage, view_transport, or approve_transport."""
+    if getattr(user, "is_superuser", False):
+        return True
+    return (
+        user_has_permission(user, "manage_transport")
+        or user_has_permission(user, "view_transport")
+        or user_has_permission(user, "approve_transport")
+    )
+
+
+def _employee_for_user(user):
+    try:
+        return user.employee_profile
+    except Exception:
+        return None
+
+
+def _driver_for_user(user):
+    emp = _employee_for_user(user)
+    if not emp:
+        return None
+    try:
+        return emp.driver_profile
+    except Exception:
+        return None
+
+
+def rides_queryset_for_user(user, qs=None):
+    """
+    Scope rides for list/history.
+    Ops (manage / view_transport / approve_transport): all rides.
+    Everyone else: only rides where they are organizer, requester, passenger, or assigned driver.
+    """
+    if qs is None:
+        qs = Ride.objects.all()
+    if user_has_transport_ops_access(user):
+        return qs
+    emp = _employee_for_user(user)
+    driver = _driver_for_user(user)
+    filt = Q(organizer=user)
+    if emp:
+        filt |= Q(requester=emp) | Q(passengers__employee=emp)
+    if driver:
+        filt |= Q(driver=driver)
+    return qs.filter(filt).distinct()
+
+
+def user_is_ride_participant(user, ride: Ride) -> bool:
+    if ride.organizer_id == getattr(user, "id", None):
+        return True
+    emp = _employee_for_user(user)
+    if emp and (ride.requester_id == emp.id or ride.passengers.filter(employee=emp).exists()):
+        return True
+    driver = _driver_for_user(user)
+    if driver and ride.driver_id == driver.id:
+        return True
+    return False
+
+
+def ride_is_joinable_carpool(ride: Ride) -> bool:
+    return bool(
+        ride.allow_carpool
+        and ride.status in JOINABLE_CARPOOL_STATUSES
+        and ride.seats_available > 0
+    )
+
+
+def user_can_view_ride(user, ride: Ride) -> bool:
+    if user_has_transport_ops_access(user):
+        return True
+    if user_is_ride_participant(user, ride):
+        return True
+    # Prospective carpool joiners may open a limited preview
+    emp = _employee_for_user(user)
+    if emp and ride_is_joinable_carpool(ride):
+        return True
+    return False
+
+
+def user_can_operate_journey(user, ride: Ride) -> bool:
+    """Start / end / board passengers: assigned driver or transport manager."""
+    if user_has_permission(user, "manage_transport") or getattr(user, "is_superuser", False):
+        return True
+    driver = _driver_for_user(user)
+    return bool(driver and ride.driver_id == driver.id)
+
 
 def next_ride_reference() -> str:
     year = timezone.now().year
@@ -169,7 +273,7 @@ def create_ride_request(
         origin_lng=origin_lng,
         scheduled_departure=scheduled_departure,
         scheduled_return=scheduled_return,
-        estimated_distance_km=estimated_distance_km,
+        estimated_distance_km=round_distance_km(estimated_distance_km),
         estimated_duration_min=estimated_duration_min,
         route_geometry=route_geometry or {},
         route_provider=route_provider or "",
@@ -258,7 +362,7 @@ def create_shuttle_ride(
         origin_lng=origin_lng,
         scheduled_departure=scheduled_departure,
         scheduled_return=scheduled_return,
-        estimated_distance_km=estimated_distance_km,
+        estimated_distance_km=round_distance_km(estimated_distance_km),
         estimated_duration_min=estimated_duration_min,
         route_geometry=route_geometry or {},
         route_provider=route_provider or "",
@@ -317,7 +421,7 @@ def apply_route_estimate(ride: Ride) -> Ride:
     if len(points) < 2:
         return ride
     result = estimate_route_or_fallback(points)
-    ride.estimated_distance_km = result.distance_km
+    ride.estimated_distance_km = round_distance_km(result.distance_km)
     ride.estimated_duration_min = result.duration_min
     ride.route_geometry = result.geometry
     ride.route_provider = result.provider
@@ -566,6 +670,8 @@ def driver_decline(ride: Ride, user, note=""):
 def start_journey(ride: Ride, user, lat=None, lng=None):
     if ride.status not in (RideStatus.READY, RideStatus.DRIVER_ACCEPTED):
         raise ValueError("Ride must be ready before starting.")
+    if not user_can_operate_journey(user, ride):
+        raise PermissionError("Only the assigned driver or a transport admin can start this journey.")
     if not ride.can_transition_to(RideStatus.IN_PROGRESS):
         raise ValueError("Invalid status transition.")
     now = timezone.now()
@@ -595,13 +701,7 @@ def start_journey(ride: Ride, user, lat=None, lng=None):
 
 
 def _user_can_board_passenger(user, ride: Ride) -> bool:
-    if user_has_permission(user, "manage_transport") or getattr(user, "is_superuser", False):
-        return True
-    emp = getattr(user, "employee_profile", None)
-    if not emp:
-        return False
-    driver = getattr(emp, "driver_profile", None)
-    return bool(driver and ride.driver_id == driver.id)
+    return user_can_operate_journey(user, ride)
 
 
 @transaction.atomic
@@ -654,6 +754,8 @@ def mark_passenger_arrived(ride: Ride, passenger: RidePassenger, user, lat=None,
         raise ValueError("Ride is not in progress.")
     if passenger.ride_id != ride.id:
         raise ValueError("Passenger does not belong to this ride.")
+    if not user_can_operate_journey(user, ride):
+        raise PermissionError("Only the assigned driver or a transport admin can mark arrivals.")
     now = timezone.now()
     passenger.status = PassengerStatus.ARRIVED
     passenger.arrived_at = now
@@ -685,12 +787,19 @@ def mark_passenger_arrived(ride: Ride, passenger: RidePassenger, user, lat=None,
             category="task",
             link=f"/transport/rides/{ride.pk}/",
         )
-    # Auto-complete ride when all passengers arrived
-    open_pax = ride.passengers.exclude(
-        status__in=[PassengerStatus.ARRIVED, PassengerStatus.CANCELLED, PassengerStatus.NO_SHOW, PassengerStatus.REJECTED]
-    )
-    if not open_pax.exists():
-        complete_ride(ride, user)
+    # Auto-complete ride when all required passengers arrived (policy default: on)
+    policy = TransportationPolicy.current()
+    if getattr(policy, "auto_complete_enabled", True):
+        open_pax = ride.passengers.exclude(
+            status__in=[
+                PassengerStatus.ARRIVED,
+                PassengerStatus.CANCELLED,
+                PassengerStatus.NO_SHOW,
+                PassengerStatus.REJECTED,
+            ]
+        )
+        if not open_pax.exists():
+            complete_ride(ride, user)
     return passenger
 
 
@@ -700,6 +809,8 @@ def complete_ride(ride: Ride, user):
         if ride.status == RideStatus.COMPLETED:
             return ride
         raise ValueError("Ride cannot be completed from current status.")
+    if not user_can_operate_journey(user, ride):
+        raise PermissionError("Only the assigned driver or a transport admin can end this ride.")
     ride.status = RideStatus.COMPLETED
     ride.actual_end_at = timezone.now()
     ride.save(update_fields=["status", "actual_end_at", "updated_at"])
@@ -1086,13 +1197,7 @@ def _confirm_join(ride: Ride, jr: JoinRequest, actor):
 
 def user_can_ping_ride(user, ride: Ride) -> bool:
     """Assigned driver, or transport manager."""
-    if user_has_permission(user, "manage_transport") or getattr(user, "is_superuser", False):
-        return True
-    emp = getattr(user, "employee_profile", None)
-    if not emp:
-        return False
-    driver = getattr(emp, "driver_profile", None)
-    return bool(driver and ride.driver_id == driver.id)
+    return user_can_operate_journey(user, ride)
 
 
 def geofence_hints(ride: Ride, lat: float, lng: float, policy: TransportationPolicy | None = None) -> dict:
@@ -1108,6 +1213,7 @@ def geofence_hints(ride: Ride, lat: float, lng: float, policy: TransportationPol
         "origin_distance_m": None,
         "near_stops": [],
         "near_passengers": [],
+        "left_origin": False,
     }
     if ride.origin_lat is not None and ride.origin_lng is not None:
         d = haversine_metres(lat, lng, float(ride.origin_lat), float(ride.origin_lng))
@@ -1147,6 +1253,45 @@ def geofence_hints(ride: Ride, lat: float, lng: float, policy: TransportationPol
     return hints
 
 
+def _previous_ping_near_origin(ride: Ride, exclude_ping_id=None, radius: float = 100) -> bool:
+    """True if a recent prior GPS sample was inside the origin geofence."""
+    if ride.origin_lat is None or ride.origin_lng is None:
+        return False
+    qs = LocationPing.objects.filter(ride=ride).order_by("-recorded_at")
+    if exclude_ping_id:
+        qs = qs.exclude(pk=exclude_ping_id)
+    prev = qs.first()
+    if not prev:
+        return False
+    d = haversine_metres(
+        float(prev.lat), float(prev.lng),
+        float(ride.origin_lat), float(ride.origin_lng),
+    )
+    return d <= radius
+
+
+def _auto_start_safeguards_ok(policy: TransportationPolicy, accuracy_m=None, speed_kmh=None) -> bool:
+    max_acc = int(getattr(policy, "auto_start_max_accuracy_m", 50) or 0)
+    if max_acc > 0 and accuracy_m is not None:
+        try:
+            if float(accuracy_m) > max_acc:
+                return False
+        except (TypeError, ValueError):
+            return False
+    min_speed = getattr(policy, "auto_start_min_speed_kmh", None) or 0
+    try:
+        min_speed = float(min_speed)
+    except (TypeError, ValueError):
+        min_speed = 0
+    if min_speed > 0 and speed_kmh is not None:
+        try:
+            if float(speed_kmh) < min_speed:
+                return False
+        except (TypeError, ValueError):
+            return False
+    return True
+
+
 @transaction.atomic
 def record_location_ping(
     ride: Ride,
@@ -1162,6 +1307,11 @@ def record_location_ping(
     """
     Persist a GPS sample and optionally assist start/arrival via geofence.
     Returns (ping, payload) where payload includes hints and any auto actions taken.
+
+    Auto-start: when policy enabled, vehicle must first have been inside the origin
+    geofence, then leave it (while READY/DRIVER_ACCEPTED), subject to accuracy/speed.
+    Auto-arrival: enter passenger destination geofence while IN_PROGRESS.
+    Auto-complete: via mark_passenger_arrived when all required passengers arrived.
     """
     if not user_can_ping_ride(user, ride):
         raise PermissionError("You cannot send location for this ride.")
@@ -1173,6 +1323,9 @@ def record_location_ping(
         raise ValueError("Ride has no vehicle assigned.")
 
     policy = TransportationPolicy.current()
+    radius = float(policy.geofence_radius_metres or 100)
+    was_near_origin = _previous_ping_near_origin(ride, radius=radius)
+
     ping = LocationPing.objects.create(
         ride=ride,
         vehicle_id=ride.vehicle_id,
@@ -1185,17 +1338,23 @@ def record_location_ping(
     )
 
     hints = geofence_hints(ride, lat, lng, policy)
+    left_origin = was_near_origin and not hints["near_origin"]
+    hints["left_origin"] = left_origin
     actions = []
 
     if apply_auto_actions:
         if (
             policy.auto_start_enabled
-            and hints["near_origin"]
+            and left_origin
             and ride.status in (RideStatus.READY, RideStatus.DRIVER_ACCEPTED)
+            and _auto_start_safeguards_ok(policy, accuracy_m=accuracy_m, speed_kmh=speed_kmh)
         ):
             start_journey(ride, user, lat=lat, lng=lng)
             ride.refresh_from_db()
-            actions.append({"type": "auto_started", "message": "Journey auto-started near origin."})
+            actions.append({
+                "type": "auto_started",
+                "message": "Journey auto-started after leaving origin geofence.",
+            })
 
         if policy.auto_arrival_enabled and ride.status == RideStatus.IN_PROGRESS:
             for item in hints["near_passengers"]:
@@ -1211,6 +1370,11 @@ def record_location_ping(
                     "message": f"Marked arrived near {passenger.destination_label}.",
                 })
             ride.refresh_from_db()
+            if ride.status == RideStatus.COMPLETED:
+                actions.append({
+                    "type": "auto_completed",
+                    "message": "Ride auto-completed after all passengers arrived.",
+                })
 
     return ping, {
         "ping_id": ping.id,
@@ -1222,6 +1386,7 @@ def record_location_ping(
             "geofence_radius_metres": policy.geofence_radius_metres,
             "auto_start_enabled": policy.auto_start_enabled,
             "auto_arrival_enabled": policy.auto_arrival_enabled,
+            "auto_complete_enabled": getattr(policy, "auto_complete_enabled", True),
         },
     }
 

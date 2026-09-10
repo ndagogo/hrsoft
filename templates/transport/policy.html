@@ -67,14 +67,36 @@
       <div class="col-md-4">
         <label class="form-label small fw-semibold">Geofence radius (m)</label>
         {{ form.geofence_radius_metres }}
+        <div class="form-text">Distance used for origin leave / destination enter detection.</div>
       </div>
       <div class="col-md-4 d-flex align-items-end">
         <div class="form-check mb-2">{{ form.auto_start_enabled }}
-          <label class="form-check-label" for="{{ form.auto_start_enabled.id_for_label }}">Auto-start near origin</label></div>
+          <label class="form-check-label" for="{{ form.auto_start_enabled.id_for_label }}">Auto-start after leaving origin</label></div>
       </div>
       <div class="col-md-4 d-flex align-items-end">
         <div class="form-check mb-2">{{ form.auto_arrival_enabled }}
-          <label class="form-check-label" for="{{ form.auto_arrival_enabled.id_for_label }}">Auto-arrival near stop</label></div>
+          <label class="form-check-label" for="{{ form.auto_arrival_enabled.id_for_label }}">Auto-arrival at destination</label></div>
+      </div>
+      <div class="col-12">
+        <div class="form-text mb-2">
+          Defaults: auto-start and auto-arrival are off. Auto-complete when all passengers have arrived is on.
+          Manual Start / End on the driver portal always remain available.
+          Auto-start requires a prior GPS ping inside the origin geofence, then a ping outside it (READY/DRIVER_ACCEPTED).
+        </div>
+      </div>
+      <div class="col-md-4 d-flex align-items-end">
+        <div class="form-check mb-2">{{ form.auto_complete_enabled }}
+          <label class="form-check-label" for="{{ form.auto_complete_enabled.id_for_label }}">Auto-complete when all arrived</label></div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">Auto-start max GPS accuracy (m)</label>
+        {{ form.auto_start_max_accuracy_m }}
+        <div class="form-text">0 disables the accuracy check.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">Auto-start min speed (km/h)</label>
+        {{ form.auto_start_min_speed_kmh }}
+        <div class="form-text">0 ignores speed. When set, leaving origin only auto-starts if reported speed meets this.</div>
       </div>
     </div>
     {% if form.errors %}

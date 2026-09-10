@@ -13,7 +13,7 @@
 
 {% block content %}
 <div class="d-flex justify-content-between mb-3 flex-wrap gap-2">
-  <a href="{% url 'transport:rides' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Rides</a>
+  <a href="{% if carpool_preview %}{% url 'transport:hub' %}{% else %}{% url 'transport:rides' %}{% endif %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>{% if carpool_preview %}Hub{% else %}Rides{% endif %}</a>
   <div class="d-flex gap-2 flex-wrap">
     {% if show_journey_link %}
     <a href="{% url 'transport:ride_journey' ride.pk %}" class="btn btn-ink btn-sm"><i class="bi bi-geo-alt me-1"></i>View live journey</a>
@@ -23,7 +23,7 @@
     {% endif %}
     {% if can_review %}
     <form method="post" action="{% url 'transport:ride_review' ride.pk 'approve' %}" class="d-inline">{% csrf_token %}<input type="hidden" name="next" value="{% url 'transport:ride_detail' ride.pk %}"><button class="btn btn-amber btn-sm">Approve</button></form>
-    <form method="post" action="{% url 'transport:ride_review' ride.pk 'reject' %}" class="d-inline" data-confirm="Reject this ride?">{% csrf_token %}<input type="hidden" name="next" value="{% url 'transport:ride_detail' ride.pk %}"><button class="btn btn-light btn-sm text-danger">Reject</button></form>
+    <form method="post" action="{% url 'transport:ride_review' ride.pk 'reject' %}" class="d-inline" data-confirm="Reject this ride?">{% csrf_token %}<input type="hidden" name="next" value="{% url 'transport:ride_detail' ride.pk %}"><button type="submit" class="btn btn-light btn-sm text-danger">Reject</button></form>
     {% endif %}
     {% if can_accept_driver %}
     <form method="post" action="{% url 'transport:driver_accept' ride.pk %}">{% csrf_token %}<button class="btn btn-amber btn-sm">Accept assignment</button></form>
@@ -37,6 +37,10 @@
   </div>
 </div>
 
+{% if carpool_preview %}
+<div class="alert alert-light border mb-3 small">Open carpool — request to join below. Passenger lists and private ride details are hidden until you are accepted.</div>
+{% endif %}
+
 <div class="row g-3">
   <div class="col-lg-7">
     <div class="surface-card mb-3">
@@ -45,17 +49,22 @@
           <div class="col-md-6"><div class="text-secondary small">Origin</div><div class="fw-semibold">{{ ride.origin_label }}</div></div>
           <div class="col-md-6"><div class="text-secondary small">Departure</div><div class="fw-semibold">{{ ride.scheduled_departure|date:"D, M d · H:i" }}</div></div>
           <div class="col-md-6"><div class="text-secondary small">Vehicle</div><div>{{ ride.vehicle.name|default:"—" }} <span class="chip">{{ ride.vehicle.registration_number|default:"" }}</span></div></div>
+          {% if not carpool_preview %}
           <div class="col-md-6"><div class="text-secondary small">Driver</div><div>{% if ride.driver %}{{ ride.driver.employee.full_name }}{% else %}—{% endif %}</div></div>
-          <div class="col-md-6"><div class="text-secondary small">Seats</div><div>{{ ride.seats_reserved }} reserved · {{ ride.seats_available }} available / {{ ride.capacity }}</div></div>
+          {% endif %}
+          <div class="col-md-6"><div class="text-secondary small">Seats</div><div>{{ ride.seats_available }} available / {{ ride.capacity }}</div></div>
+          {% if not carpool_preview %}
           <div class="col-md-6"><div class="text-secondary small">Purpose</div><div>{{ ride.purpose|default:"—" }}</div></div>
           {% if ride.estimated_distance_km or ride.estimated_duration_min %}
           <div class="col-md-6"><div class="text-secondary small">Distance / ETA</div><div>{% if ride.estimated_distance_km %}{{ ride.estimated_distance_km }} km{% else %}—{% endif %}{% if ride.estimated_duration_min %} · ~{{ ride.estimated_duration_min }} min{% endif %}{% if ride.route_provider %} <span class="text-secondary small">({{ ride.route_provider }})</span>{% endif %}</div></div>
           {% endif %}
           {% if not ride.requester %}<div class="col-md-6"><div class="text-secondary small">Organizer</div><div>{{ ride.organizer.get_full_name|default:ride.organizer.username }} <span class="chip">shuttle</span></div></div>{% endif %}
+          {% endif %}
         </div>
       </div>
     </div>
 
+    {% if not carpool_preview %}
     {% if map_markers or route_geometry_json.coordinates %}
     <div class="surface-card mb-3">
       <div class="surface-card-header"><h3 class="surface-card-title">Route map</h3></div>
@@ -115,6 +124,7 @@
         </ol>
       </div>
     </div>
+    {% endif %}
 
     {% if can_join %}
     <div class="surface-card mb-3">
@@ -161,6 +171,7 @@
   </div>
 
   <div class="col-lg-5">
+    {% if not carpool_preview %}
     <div class="surface-card mb-3">
       <div class="surface-card-header"><h3 class="surface-card-title">Journey timeline</h3></div>
       <div class="surface-card-body">
@@ -194,6 +205,7 @@
         {% endfor %}
       </div>
     </div>
+    {% endif %}
 
     {% if can_cancel %}
     <div class="surface-card mt-3">
@@ -203,7 +215,7 @@
           {% csrf_token %}
           <label class="form-label small fw-semibold">Reason{% if cancel_reason_required %} <span class="text-danger">*</span>{% endif %}</label>
           <input type="text" name="reason" class="form-control mb-2" {% if cancel_reason_required %}required{% endif %} placeholder="Cancellation reason" maxlength="255">
-          <button class="btn btn-sm btn-light text-danger">Cancel ride</button>
+          <button type="submit" class="btn btn-sm btn-light text-danger">Cancel ride</button>
         </form>
       </div>
     </div>
@@ -217,7 +229,7 @@
         <form method="post" action="{% url 'transport:passenger_leave' ride.pk %}" data-confirm="Leave this ride?">
           {% csrf_token %}
           <input type="text" name="reason" class="form-control mb-2" placeholder="Optional note" maxlength="255">
-          <button class="btn btn-sm btn-light text-danger">Leave ride</button>
+          <button type="submit" class="btn btn-sm btn-light text-danger">Leave ride</button>
         </form>
       </div>
     </div>

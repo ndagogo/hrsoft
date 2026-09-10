@@ -130,17 +130,32 @@ class RideRequestForm(forms.Form):
     driver = forms.ModelChoiceField(
         queryset=Driver.objects.none(),
         required=False,
-        widget=forms.Select(attrs={"class": "form-select"}),
+        widget=forms.Select(attrs={"class": "form-select", "id": "id_driver"}),
+        help_text="Optional — assigned later if blank.",
     )
     estimated_distance_km = forms.DecimalField(
         required=False,
         min_value=0,
-        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.1", "id": "id_estimated_distance_km"}),
+        decimal_places=1,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "step": "0.1",
+            "id": "id_estimated_distance_km",
+            "readonly": True,
+            "tabindex": "-1",
+        }),
+        help_text="Filled automatically from the map route.",
     )
     estimated_duration_min = forms.IntegerField(
         required=False,
         min_value=1,
-        widget=forms.NumberInput(attrs={"class": "form-control", "id": "id_estimated_duration_min"}),
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "id": "id_estimated_duration_min",
+            "readonly": True,
+            "tabindex": "-1",
+        }),
+        help_text="Filled automatically from the map route.",
     )
     origin_lat = forms.DecimalField(required=False, widget=forms.HiddenInput(attrs={"id": "id_origin_lat"}))
     origin_lng = forms.DecimalField(required=False, widget=forms.HiddenInput(attrs={"id": "id_origin_lng"}))
@@ -157,13 +172,20 @@ class RideRequestForm(forms.Form):
         self.fields["driver"].queryset = Driver.objects.filter(status="active").select_related(
             "employee__user"
         )
-        self.fields["driver"].empty_label = "Assign later / default"
+        self.fields["driver"].empty_label = "Assign later (optional)"
+        self.fields["driver"].label = "Driver (optional — assigned later if blank)"
 
     def clean_scheduled_departure(self):
         dt = self.cleaned_data["scheduled_departure"]
         if dt < timezone.now() - timedelta(minutes=5):
             raise forms.ValidationError("Departure time cannot be in the past.")
         return dt
+
+    def clean_estimated_distance_km(self):
+        val = self.cleaned_data.get("estimated_distance_km")
+        if val is None:
+            return val
+        return round(val, 1)
 
     def cleaned_route_geometry(self):
         import json
@@ -204,7 +226,8 @@ class ShuttleRideForm(forms.Form):
     driver = forms.ModelChoiceField(
         queryset=Driver.objects.none(),
         required=False,
-        widget=forms.Select(attrs={"class": "form-select"}),
+        widget=forms.Select(attrs={"class": "form-select", "id": "id_shuttle_driver"}),
+        help_text="Optional — assigned later if blank.",
     )
     allow_carpool = forms.BooleanField(
         required=False,
@@ -214,12 +237,28 @@ class ShuttleRideForm(forms.Form):
     origin_lat = forms.DecimalField(required=False, widget=forms.HiddenInput(attrs={"id": "id_shuttle_origin_lat"}))
     origin_lng = forms.DecimalField(required=False, widget=forms.HiddenInput(attrs={"id": "id_shuttle_origin_lng"}))
     estimated_distance_km = forms.DecimalField(
-        required=False, min_value=0,
-        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.1", "id": "id_shuttle_distance"}),
+        required=False,
+        min_value=0,
+        decimal_places=1,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "step": "0.1",
+            "id": "id_shuttle_distance",
+            "readonly": True,
+            "tabindex": "-1",
+        }),
+        help_text="Filled automatically from the map route.",
     )
     estimated_duration_min = forms.IntegerField(
-        required=False, min_value=1,
-        widget=forms.NumberInput(attrs={"class": "form-control", "id": "id_shuttle_duration"}),
+        required=False,
+        min_value=1,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "id": "id_shuttle_duration",
+            "readonly": True,
+            "tabindex": "-1",
+        }),
+        help_text="Filled automatically from the map route.",
     )
     route_geometry_json = forms.CharField(required=False, widget=forms.HiddenInput(attrs={"id": "id_shuttle_route_json"}))
     route_provider = forms.CharField(required=False, widget=forms.HiddenInput(attrs={"id": "id_shuttle_route_provider"}))
@@ -230,13 +269,20 @@ class ShuttleRideForm(forms.Form):
             status=VehicleStatus.RETIRED
         ).order_by("name")
         self.fields["driver"].queryset = Driver.objects.filter(status="active").select_related("employee__user")
-        self.fields["driver"].empty_label = "Assign later / default"
+        self.fields["driver"].empty_label = "Assign later (optional)"
+        self.fields["driver"].label = "Driver (optional — assigned later if blank)"
 
     def clean_scheduled_departure(self):
         dt = self.cleaned_data["scheduled_departure"]
         if dt < timezone.now() - timedelta(minutes=5):
             raise forms.ValidationError("Departure time cannot be in the past.")
         return dt
+
+    def clean_estimated_distance_km(self):
+        val = self.cleaned_data.get("estimated_distance_km")
+        if val is None:
+            return val
+        return round(val, 1)
 
     def cleaned_route_geometry(self):
         import json
@@ -316,6 +362,7 @@ class TransportationPolicyForm(forms.ModelForm):
             "require_manager_approval", "require_transport_approval", "require_driver_acceptance",
             "allow_carpooling", "max_route_deviation_percent",
             "geofence_radius_metres", "auto_start_enabled", "auto_arrival_enabled",
+            "auto_complete_enabled", "auto_start_max_accuracy_m", "auto_start_min_speed_kmh",
             "min_booking_notice_hours", "estimated_cost_per_km",
             "require_cancel_reason_after_approval",
         ]
@@ -332,6 +379,11 @@ class TransportationPolicyForm(forms.ModelForm):
             "geofence_radius_metres": forms.NumberInput(attrs={"class": "form-control", "min": 10}),
             "auto_start_enabled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "auto_arrival_enabled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "auto_complete_enabled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "auto_start_max_accuracy_m": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
+            "auto_start_min_speed_kmh": forms.NumberInput(attrs={
+                "class": "form-control", "step": "0.1", "min": "0",
+            }),
             "min_booking_notice_hours": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
             "estimated_cost_per_km": forms.NumberInput(attrs={
                 "class": "form-control", "step": "0.01", "min": "0",

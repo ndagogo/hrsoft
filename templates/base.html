@@ -72,8 +72,13 @@
         <i class="bi bi-person-check"></i> Stand-in Requests
       </a>
       {% if 'approve_leave' in perms_set %}
-      <a href="{% url 'leave:approvals' %}" class="sidebar-link {% if request.resolver_match.url_name == 'approvals' %}active{% endif %}">
+      <a href="{% url 'leave:approvals' %}" class="sidebar-link {% if request.resolver_match.app_name == 'leave' and request.resolver_match.url_name == 'approvals' %}active{% endif %}">
         <i class="bi bi-clipboard-check-fill"></i> Leave Approvals
+      </a>
+      {% endif %}
+      {% if 'approve_transport' in perms_set or 'manage_transport' in perms_set %}
+      <a href="{% url 'transport:approvals' %}" class="sidebar-link {% if request.resolver_match.app_name == 'transport' and request.resolver_match.url_name == 'approvals' %}active{% endif %}">
+        <i class="bi bi-truck-front"></i> Transport Approvals
       </a>
       {% endif %}
       {% if 'view_recruitment' in perms_set %}

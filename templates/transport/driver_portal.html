@@ -170,8 +170,11 @@
     const hints = data.hints || {};
     const parts = [];
     if (hints.near_origin) {
-      parts.push("Near origin (" + (hints.origin_distance_m || "?") + " m) — tap Start if ready");
+      parts.push("Near origin (" + (hints.origin_distance_m || "?") + " m)");
       highlightStart(ride.id, true);
+    } else if (hints.left_origin) {
+      parts.push("Left origin geofence — journey may auto-start");
+      highlightStart(ride.id, false);
     } else {
       highlightStart(ride.id, false);
     }

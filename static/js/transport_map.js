@@ -143,7 +143,9 @@
       if (!state.origin || !state.destination) return;
       try {
         const data = await route([state.origin, state.destination]);
-        if (options.distanceInput) options.distanceInput.value = data.distance_km;
+        if (options.distanceInput) options.distanceInput.value = data.distance_km != null
+          ? Number(data.distance_km).toFixed(1)
+          : "";
         if (options.durationInput) options.durationInput.value = data.duration_min;
         if (options.geometryInput)
           options.geometryInput.value = JSON.stringify(data.geometry || {});
@@ -156,7 +158,7 @@
         }
         if (options.statusEl) {
           options.statusEl.textContent =
-            data.distance_km + " km · ~" + data.duration_min + " min (" + data.provider + ")";
+            Number(data.distance_km).toFixed(1) + " km · ~" + data.duration_min + " min (" + data.provider + ")";
         }
       } catch (e) {
         if (options.statusEl) options.statusEl.textContent = "Could not calculate route.";
@@ -259,7 +261,9 @@
       if (points.length < 2) return;
       try {
         const data = await route(points);
-        if (options.distanceInput) options.distanceInput.value = data.distance_km;
+        if (options.distanceInput) options.distanceInput.value = data.distance_km != null
+          ? Number(data.distance_km).toFixed(1)
+          : "";
         if (options.durationInput) options.durationInput.value = data.duration_min;
         if (options.geometryInput)
           options.geometryInput.value = JSON.stringify(data.geometry || {});
@@ -272,7 +276,7 @@
         }
         if (options.statusEl) {
           options.statusEl.textContent =
-            data.distance_km + " km · ~" + data.duration_min + " min · " + (points.length - 1) + " stop(s)";
+            Number(data.distance_km).toFixed(1) + " km · ~" + data.duration_min + " min · " + (points.length - 1) + " stop(s)";
         }
       } catch (e) {
         if (options.statusEl) options.statusEl.textContent = "Could not calculate route.";

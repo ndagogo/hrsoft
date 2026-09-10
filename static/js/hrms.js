@@ -129,13 +129,63 @@ function initLiveClock() {
   setInterval(tick, 30000);
 }
 
-// SweetAlert2 confirm for delete forms
+// SweetAlert2 confirm for destructive actions (links, buttons, or forms)
 function initConfirmDeletes() {
   document.querySelectorAll("[data-confirm]").forEach((el) => {
+    if (el.tagName === "FORM") {
+      el.addEventListener("submit", function (e) {
+        if (this.dataset.confirmArmed === "1") {
+          delete this.dataset.confirmArmed;
+          return;
+        }
+        e.preventDefault();
+        if (typeof this.reportValidity === "function" && !this.reportValidity()) {
+          return;
+        }
+        const msg = this.dataset.confirm || "Are you sure?";
+        const form = this;
+        const proceed = () => {
+          form.dataset.confirmArmed = "1";
+          if (typeof form.requestSubmit === "function") {
+            form.requestSubmit();
+          } else {
+            HTMLFormElement.prototype.submit.call(form);
+          }
+        };
+        if (typeof Swal !== "undefined") {
+          Swal.fire({
+            title: "Confirm",
+            text: msg,
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#f5a524",
+            cancelButtonColor: "#64748b",
+            confirmButtonText: "Yes, proceed",
+          }).then((result) => {
+            if (result.isConfirmed) proceed();
+          });
+        } else if (confirm(msg)) {
+          proceed();
+        }
+      });
+      return;
+    }
+
     el.addEventListener("click", function (e) {
       e.preventDefault();
+      e.stopPropagation();
       const msg = this.dataset.confirm || "Are you sure?";
       const href = this.href || this.dataset.href;
+      const proceed = () => {
+        if (this.tagName === "A") {
+          window.location.href = href;
+        } else if (this.form) {
+          HTMLFormElement.prototype.submit.call(this.form);
+        } else {
+          const form = this.closest("form");
+          if (form) HTMLFormElement.prototype.submit.call(form);
+        }
+      };
       if (typeof Swal !== "undefined") {
         Swal.fire({
           title: "Confirm",
@@ -146,13 +196,10 @@ function initConfirmDeletes() {
           cancelButtonColor: "#64748b",
           confirmButtonText: "Yes, proceed",
         }).then((result) => {
-          if (result.isConfirmed) {
-            if (this.tagName === "A") window.location.href = href;
-            else if (this.form) this.form.submit();
-          }
+          if (result.isConfirmed) proceed();
         });
       } else if (confirm(msg)) {
-        if (this.tagName === "A") window.location.href = href;
+        proceed();
       }
     });
   });

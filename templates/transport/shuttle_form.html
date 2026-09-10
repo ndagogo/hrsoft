@@ -26,14 +26,26 @@
         <div class="surface-card-header"><h3 class="surface-card-title">Shuttle details</h3></div>
         <div class="surface-card-body">
           <div class="row g-3">
-            <div class="col-md-6"><label class="form-label fw-semibold">Vehicle</label>{{ form.vehicle }}</div>
-            <div class="col-md-6"><label class="form-label fw-semibold">Driver</label>{{ form.driver }}</div>
+            <div class="col-md-6"><label class="form-label fw-semibold">Vehicle</label>{{ form.vehicle }}
+              <div id="vehiclePhotoPreview" class="mt-2 d-none">
+                <img src="" alt="Vehicle" class="rounded border" style="max-height:88px;max-width:100%;object-fit:cover;">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Driver (optional — assigned later if blank)</label>
+              {{ form.driver }}
+              <div class="form-text">Selecting a vehicle may pre-fill its default driver.</div>
+            </div>
             <div class="col-12"><label class="form-label fw-semibold">Origin</label>{{ form.origin_label }}</div>
             <div class="col-md-6"><label class="form-label fw-semibold">Departure</label>{{ form.scheduled_departure }}</div>
             <div class="col-md-6"><label class="form-label fw-semibold">Return (optional)</label>{{ form.scheduled_return }}</div>
             <div class="col-12"><label class="form-label fw-semibold">Purpose</label>{{ form.purpose }}</div>
-            <div class="col-md-4"><label class="form-label fw-semibold">Est. km</label>{{ form.estimated_distance_km }}</div>
-            <div class="col-md-4"><label class="form-label fw-semibold">Est. minutes</label>{{ form.estimated_duration_min }}</div>
+            <div class="col-md-4"><label class="form-label fw-semibold">Est. km</label>{{ form.estimated_distance_km }}
+              <div class="form-text">From map routing</div>
+            </div>
+            <div class="col-md-4"><label class="form-label fw-semibold">Est. minutes</label>{{ form.estimated_duration_min }}
+              <div class="form-text">From map routing</div>
+            </div>
             <div class="col-md-4 d-flex align-items-end">
               <div class="form-check mb-2">{{ form.allow_carpool }} <label class="form-check-label">Allow carpool joins</label></div>
             </div>
@@ -130,6 +142,34 @@
       providerInput: document.getElementById("id_shuttle_route_provider"),
       statusEl: document.getElementById("shuttleRouteStatus"),
     });
+
+    const photoMap = {{ vehicle_photo_map_json|safe }};
+    const driverMap = {{ vehicle_default_driver_map_json|safe }};
+    const vehicleSel = document.getElementById("id_vehicle");
+    const driverSel = document.getElementById("id_shuttle_driver");
+    const preview = document.getElementById("vehiclePhotoPreview");
+    const previewImg = preview ? preview.querySelector("img") : null;
+    function syncVehicleExtras() {
+      if (!vehicleSel) return;
+      const vid = vehicleSel.value;
+      if (preview && previewImg) {
+        const url = photoMap[vid];
+        if (url) {
+          previewImg.src = url;
+          preview.classList.remove("d-none");
+        } else {
+          previewImg.removeAttribute("src");
+          preview.classList.add("d-none");
+        }
+      }
+      if (driverSel && driverMap[vid] && !driverSel.value) {
+        driverSel.value = String(driverMap[vid]);
+      }
+    }
+    if (vehicleSel) {
+      vehicleSel.addEventListener("change", syncVehicleExtras);
+      syncVehicleExtras();
+    }
   });
 </script>
 {% endblock %}

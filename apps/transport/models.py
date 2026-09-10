@@ -338,8 +338,30 @@ class TransportationPolicy(models.Model):
     allow_carpooling = models.BooleanField(default=True)
     max_route_deviation_percent = models.PositiveSmallIntegerField(default=20)
     geofence_radius_metres = models.PositiveIntegerField(default=100)
-    auto_start_enabled = models.BooleanField(default=False)
-    auto_arrival_enabled = models.BooleanField(default=False)
+    auto_start_enabled = models.BooleanField(
+        default=False,
+        help_text="When enabled, start the journey after the vehicle leaves the origin geofence "
+                  "(must first have been inside). Requires READY/DRIVER_ACCEPTED; accuracy safeguard applies.",
+    )
+    auto_arrival_enabled = models.BooleanField(
+        default=False,
+        help_text="When enabled, mark passengers arrived when the vehicle enters their destination geofence.",
+    )
+    auto_complete_enabled = models.BooleanField(
+        default=True,
+        help_text="When enabled, complete the ride once all required passengers are ARRIVED "
+                  "(cancelled/no-show/rejected excluded). Drivers can still End ride manually.",
+    )
+    auto_start_max_accuracy_m = models.PositiveIntegerField(
+        default=50,
+        help_text="Ignore auto-start if GPS accuracy is worse than this many metres (0 = no check).",
+    )
+    auto_start_min_speed_kmh = models.DecimalField(
+        max_digits=5,
+        decimal_places=1,
+        default=0,
+        help_text="Optional: if > 0 and speed is reported, require at least this speed (km/h) when leaving origin.",
+    )
     min_booking_notice_hours = models.PositiveSmallIntegerField(default=1)
     estimated_cost_per_km = models.DecimalField(
         max_digits=12,

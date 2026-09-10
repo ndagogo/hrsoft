@@ -107,23 +107,24 @@ def hub(request):
     driver = _driver_or_none(request.user)
 
     my_rides = Ride.objects.none()
-    if emp:
+    if emp or request.user.is_authenticated:
         my_rides = (
-            Ride.objects.filter(Q(requester=emp) | Q(passengers__employee=emp))
-            .distinct()
+            services.rides_queryset_for_user(request.user)
             .select_related("vehicle", "driver__employee__user")
             .order_by("-scheduled_departure")[:10]
         )
 
     open_carpools = Ride.objects.filter(
         allow_carpool=True,
-        status__in=[
-            RideStatus.APPROVED, RideStatus.DRIVER_PENDING, RideStatus.DRIVER_ACCEPTED,
-            RideStatus.READY, RideStatus.PENDING_APPROVAL,
-        ],
+        status__in=services.JOINABLE_CARPOOL_STATUSES,
     ).select_related("vehicle", "driver__employee__user").annotate(
         pax=Count("passengers")
     ).order_by("scheduled_departure")[:12]
+    # Hide carpools the user is already on
+    if emp:
+        open_carpools = open_carpools.exclude(
+            Q(requester=emp) | Q(passengers__employee=emp)
+        ).distinct()
 
     stats = {}
     due_reminders = []
@@ -145,7 +146,11 @@ def hub(request):
         "can_history": can_history,
         "can_live": can_live,
         "can_create": user_has_permission(request.user, "create_ride") or can_manage,
-        "can_approve": user_has_permission(request.user, "approve_transport") or can_manage,
+        "can_approve": (
+            user_has_permission(request.user, "approve_transport")
+            or can_manage
+            or bool(services.pending_approvals_for_user(request.user))
+        ),
         "is_driver": bool(driver),
         "my_rides": my_rides,
         "open_carpools": open_carpools,
@@ -475,15 +480,12 @@ def driver_edit(request, pk):
 @login_required
 def ride_list(request):
     can_manage = user_has_permission(request.user, "manage_transport")
-    can_view_all = can_manage or user_has_permission(request.user, "view_transport")
-    emp = _employee_or_none(request.user)
-    qs = Ride.objects.select_related("vehicle", "driver__employee__user", "requester__user", "organizer")
-    if can_view_all:
-        rides = qs.all()[:100]
-    elif emp:
-        rides = qs.filter(Q(requester=emp) | Q(passengers__employee=emp) | Q(organizer=request.user)).distinct()[:50]
-    else:
-        rides = qs.filter(organizer=request.user)[:50]
+    qs = Ride.objects.select_related(
+        "vehicle", "driver__employee__user", "requester__user", "organizer",
+    )
+    rides = services.rides_queryset_for_user(request.user, qs).order_by(
+        "-scheduled_departure", "-created_at",
+    )[:100 if services.user_has_transport_ops_access(request.user) else 50]
     return render(request, "transport/rides.html", {
         "rides": rides,
         "can_create": user_has_permission(request.user, "create_ride") or can_manage,
@@ -492,10 +494,10 @@ def ride_list(request):
 
 
 def _can_view_transport_history(user) -> bool:
+    """History page: ops roles or anyone with create_ride (scoped to own rides)."""
     return (
-        user_has_permission(user, "view_transport")
-        or user_has_permission(user, "manage_transport")
-        or user_has_permission(user, "approve_transport")
+        services.user_has_transport_ops_access(user)
+        or user_has_permission(user, "create_ride")
         or getattr(user, "is_superuser", False)
     )
 
@@ -503,15 +505,17 @@ def _can_view_transport_history(user) -> bool:
 @login_required
 def transport_history(request):
     """
-    Full transport management history: all ride requests, approval decisions,
-    and operational status events across the module.
+    Transport history: ops see org-wide; employees see only rides they participate in.
     """
     if not _can_view_transport_history(request.user):
         messages.error(request, "You don't have permission to view transport history.")
         return redirect("transport:hub")
 
+    is_ops = services.user_has_transport_ops_access(request.user)
     tab = (request.GET.get("tab") or "requests").strip().lower()
     if tab not in {"requests", "approvals", "activity"}:
+        tab = "requests"
+    if not is_ops and tab in {"approvals", "activity"}:
         tab = "requests"
 
     q = (request.GET.get("q") or "").strip()
@@ -521,9 +525,12 @@ def transport_history(request):
     date_from = parse_date(request.GET.get("date_from") or "")
     date_to = parse_date(request.GET.get("date_to") or "")
 
-    rides_qs = Ride.objects.select_related(
-        "vehicle", "driver__employee__user", "requester__user", "organizer",
-    ).prefetch_related("passengers", "approval_steps")
+    rides_qs = services.rides_queryset_for_user(
+        request.user,
+        Ride.objects.select_related(
+            "vehicle", "driver__employee__user", "requester__user", "organizer",
+        ).prefetch_related("passengers", "approval_steps"),
+    )
 
     if q:
         rides_qs = rides_qs.filter(
@@ -546,9 +553,15 @@ def transport_history(request):
     if date_to:
         rides_qs = rides_qs.filter(scheduled_departure__date__lte=date_to)
 
+    visible_ride_ids = None
+    if not is_ops:
+        visible_ride_ids = list(rides_qs.values_list("id", flat=True)[:5000])
+
     events_qs = RideEvent.objects.select_related(
         "ride", "ride__vehicle", "actor", "passenger__employee__user",
     ).order_by("-created_at")
+    if visible_ride_ids is not None:
+        events_qs = events_qs.filter(ride_id__in=visible_ride_ids)
     if q:
         events_qs = events_qs.filter(
             Q(ride__reference__icontains=q)
@@ -573,6 +586,8 @@ def transport_history(request):
     ).select_related(
         "ride", "ride__vehicle", "ride__requester__user", "acted_by",
     ).order_by("-acted_at", "-id")
+    if visible_ride_ids is not None:
+        approvals_qs = approvals_qs.filter(ride_id__in=visible_ride_ids)
     if q:
         approvals_qs = approvals_qs.filter(
             Q(ride__reference__icontains=q)
@@ -603,24 +618,32 @@ def transport_history(request):
             request.GET.get("page")
         )
 
+    scoped_rides = services.rides_queryset_for_user(request.user)
     status_counts = {
         row["status"]: row["c"]
-        for row in Ride.objects.values("status").annotate(c=Count("id"))
+        for row in scoped_rides.values("status").annotate(c=Count("id"))
     }
     stats = {
-        "total_rides": Ride.objects.count(),
+        "total_rides": scoped_rides.count(),
         "pending": status_counts.get(RideStatus.PENDING_APPROVAL, 0),
-        "active": Ride.objects.filter(status__in=services.ACTIVE_RIDE_STATUSES).count(),
+        "active": scoped_rides.filter(status__in=services.ACTIVE_RIDE_STATUSES).count(),
         "completed": status_counts.get(RideStatus.COMPLETED, 0),
         "rejected": status_counts.get(RideStatus.REJECTED, 0),
         "cancelled": (
             status_counts.get(RideStatus.CANCELLED, 0)
             + status_counts.get(RideStatus.ABORTED, 0)
         ),
-        "events": RideEvent.objects.count(),
-        "approval_decisions": RideApprovalStep.objects.filter(
-            status__in=[StepStatus.APPROVED, StepStatus.REJECTED]
-        ).count(),
+        "events": events_qs.count() if not is_ops else RideEvent.objects.count(),
+        "approval_decisions": (
+            RideApprovalStep.objects.filter(
+                status__in=[StepStatus.APPROVED, StepStatus.REJECTED],
+                ride_id__in=visible_ride_ids,
+            ).count()
+            if visible_ride_ids is not None
+            else RideApprovalStep.objects.filter(
+                status__in=[StepStatus.APPROVED, StepStatus.REJECTED]
+            ).count()
+        ),
     }
 
     filter_params = request.GET.copy()
@@ -642,7 +665,25 @@ def transport_history(request):
         "q": q,
         "filter_query": filter_query,
         "can_manage": user_has_permission(request.user, "manage_transport"),
+        "is_ops": is_ops,
     })
+
+
+def _vehicle_form_maps():
+    """JS maps: vehicle id → photo URL / default driver id."""
+    import json
+    photo_map = {}
+    driver_map = {}
+    for v in Vehicle.objects.filter(is_active=True).prefetch_related("default_drivers"):
+        if v.photo:
+            photo_map[str(v.pk)] = v.photo.url
+        d = v.default_drivers.filter(status="active").first()
+        if d:
+            driver_map[str(v.pk)] = d.pk
+    return {
+        "vehicle_photo_map_json": json.dumps(photo_map),
+        "vehicle_default_driver_map_json": json.dumps(driver_map),
+    }
 
 
 @login_required
@@ -699,7 +740,11 @@ def ride_create(request):
     else:
         form = RideRequestForm()
 
-    return render(request, "transport/ride_form.html", {"form": form, **_map_defaults()})
+    return render(request, "transport/ride_form.html", {
+        "form": form,
+        **_map_defaults(),
+        **_vehicle_form_maps(),
+    })
 
 
 @login_required
@@ -762,6 +807,7 @@ def shuttle_create(request):
         "form": form,
         "formset": formset,
         **_map_defaults(),
+        **_vehicle_form_maps(),
     })
 
 
@@ -823,29 +869,47 @@ def ride_detail(request, pk):
     is_passenger = emp and ride.passengers.filter(employee=emp).exists()
     is_requester = emp and ride.requester_id == emp.id
     is_assigned_driver = driver and ride.driver_id == driver.id
+    is_participant = services.user_is_ride_participant(request.user, ride)
+    is_ops = services.user_has_transport_ops_access(request.user)
 
-    if not (can_manage or is_organizer or is_passenger or is_requester or is_assigned_driver
-            or user_has_permission(request.user, "view_transport")
-            or user_has_permission(request.user, "approve_transport")):
+    if not services.user_can_view_ride(request.user, ride):
         messages.error(request, "You cannot view this ride.")
         return redirect("transport:hub")
 
+    # Carpool preview: joinable but not a participant and not ops — limited UI
+    carpool_preview = (
+        not is_participant
+        and not is_ops
+        and services.ride_is_joinable_carpool(ride)
+        and emp
+        and not is_passenger
+    )
+
+    can_operate = services.user_can_operate_journey(request.user, ride)
+
     return render(request, "transport/ride_detail.html", {
         "ride": ride,
-        "events": ride.events.select_related("actor", "passenger__employee__user")[:80],
+        "events": (
+            [] if carpool_preview
+            else ride.events.select_related("actor", "passenger__employee__user")[:80]
+        ),
         "can_manage": can_manage,
-        "can_review": services.user_can_review_ride(request.user, ride),
-        "can_submit": ride.status == RideStatus.DRAFT and (is_organizer or is_requester or can_manage),
-        "can_accept_driver": ride.status == RideStatus.DRIVER_PENDING and (is_assigned_driver or can_manage),
-        "can_start": ride.status in (RideStatus.READY, RideStatus.DRIVER_ACCEPTED) and (
+        "carpool_preview": carpool_preview,
+        "can_review": (not carpool_preview) and services.user_can_review_ride(request.user, ride),
+        "can_submit": (not carpool_preview) and ride.status == RideStatus.DRAFT and (
+            is_organizer or is_requester or can_manage
+        ),
+        "can_accept_driver": ride.status == RideStatus.DRIVER_PENDING and (
             is_assigned_driver or can_manage
         ),
-        "can_complete": ride.status == RideStatus.IN_PROGRESS and (is_assigned_driver or can_manage),
+        "can_start": ride.status in (RideStatus.READY, RideStatus.DRIVER_ACCEPTED) and can_operate,
+        "can_complete": ride.status == RideStatus.IN_PROGRESS and can_operate,
         "can_board": ride.status in (
             RideStatus.READY, RideStatus.DRIVER_ACCEPTED, RideStatus.IN_PROGRESS,
-        ) and (is_assigned_driver or can_manage),
+        ) and can_operate,
         "can_cancel": (
-            services.user_can_cancel_ride(request.user, ride)
+            (not carpool_preview)
+            and services.user_can_cancel_ride(request.user, ride)
             and ride.status not in (
                 RideStatus.COMPLETED, RideStatus.CANCELLED, RideStatus.ABORTED, RideStatus.IN_PROGRESS,
             )
@@ -861,10 +925,7 @@ def ride_detail(request, pk):
         "can_join": (
             emp and ride.allow_carpool
             and not is_passenger
-            and ride.status in (
-                RideStatus.APPROVED, RideStatus.DRIVER_PENDING, RideStatus.DRIVER_ACCEPTED,
-                RideStatus.READY, RideStatus.PENDING_APPROVAL,
-            )
+            and ride.status in services.JOINABLE_CARPOOL_STATUSES
         ),
         "is_organizer": is_organizer,
         "is_passenger": is_passenger,
@@ -878,12 +939,15 @@ def ride_detail(request, pk):
         "join_form": JoinRequestForm(),
         "review_form": ReviewForm(),
         "cancel_form": CancelRideForm(),
-        "pending_joins": ride.join_requests.filter(
-            status__in=[
-                JoinRequestStatus.PENDING,
-                JoinRequestStatus.ORGANIZER_APPROVED,
-                JoinRequestStatus.ADMIN_APPROVED,
-            ]
+        "pending_joins": (
+            [] if carpool_preview
+            else ride.join_requests.filter(
+                status__in=[
+                    JoinRequestStatus.PENDING,
+                    JoinRequestStatus.ORGANIZER_APPROVED,
+                    JoinRequestStatus.ADMIN_APPROVED,
+                ]
+            )
         ),
         "employee": emp,
         "route_geometry_json": ride.route_geometry or {},
@@ -935,6 +999,15 @@ def passenger_leave(request, pk):
 
 @login_required
 def approvals(request):
+    """Transport ride approvals only — not leave approvals."""
+    if not (
+        user_has_permission(request.user, "approve_transport")
+        or user_has_permission(request.user, "manage_transport")
+        or getattr(request.user, "is_superuser", False)
+        or services.pending_approvals_for_user(request.user)
+    ):
+        # Department managers without approve_transport may still act via manager stage
+        pass
     pending = services.pending_approvals_for_user(request.user)
     return render(request, "transport/approvals.html", {
         "pending": pending,
@@ -946,10 +1019,15 @@ def approvals(request):
 @require_POST
 def ride_review(request, pk, action):
     ride = get_object_or_404(Ride, pk=pk)
+    action = (action or "").strip().lower()
+    if action not in ("approve", "reject"):
+        messages.error(request, "Invalid review action.")
+        return redirect("transport:approvals")
     note = request.POST.get("note", "")
     try:
-        services.process_approval(ride, request.user, "approve" if action == "approve" else "reject", note)
-        messages.success(request, f"Ride {action}d.")
+        services.process_approval(ride, request.user, action, note)
+        label = "approved" if action == "approve" else "rejected"
+        messages.success(request, f"Ride {label}.")
     except (ValueError, PermissionError) as exc:
         messages.error(request, str(exc))
     next_url = request.POST.get("next") or ""
@@ -1049,9 +1127,12 @@ def ride_start(request, pk):
     try:
         services.start_journey(ride, request.user)
         messages.success(request, "Journey started.")
-    except ValueError as exc:
+    except (ValueError, PermissionError) as exc:
         messages.error(request, str(exc))
-    return redirect(request.POST.get("next") or f"/transport/rides/{pk}/")
+    next_url = request.POST.get("next") or ""
+    if next_url.startswith("/"):
+        return redirect(next_url)
+    return redirect("transport:ride_detail", pk=pk)
 
 
 @login_required
@@ -1061,7 +1142,7 @@ def ride_complete(request, pk):
     try:
         services.complete_ride(ride, request.user)
         messages.success(request, "Ride completed.")
-    except ValueError as exc:
+    except (ValueError, PermissionError) as exc:
         messages.error(request, str(exc))
     return redirect("transport:ride_detail", pk=pk)
 
@@ -1074,7 +1155,7 @@ def passenger_arrived(request, pk, passenger_id):
     try:
         services.mark_passenger_arrived(ride, passenger, request.user)
         messages.success(request, f"Marked arrived: {passenger.destination_label}")
-    except ValueError as exc:
+    except (ValueError, PermissionError) as exc:
         messages.error(request, str(exc))
     next_url = request.POST.get("next") or ""
     if next_url.startswith("/"):
