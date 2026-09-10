@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Driver portal{% endblock %}
 {% block page_title %}Driver portal{% endblock %}
 {% block page_subtitle %}{% if driver %}{{ driver.employee.full_name }}{% else %}Transport ops{% endif %}{% endblock %}
@@ -6,9 +7,12 @@
 {% block content %}
 <a href="{% url 'transport:hub' %}" class="btn btn-light btn-sm mb-3"><i class="bi bi-arrow-left me-1"></i>Hub</a>
 
-<div class="row g-3" style="max-width:560px;">
+<div id="gpsHintBanner" class="alert alert-warning d-none mb-3" role="status"></div>
+<div id="gpsStatus" class="text-secondary small mb-3"></div>
+
+<div class="row g-3" style="max-width:640px;">
 {% for r in assigned %}
-  <div class="col-12">
+  <div class="col-12" data-ride-card="{{ r.id }}">
     <div class="surface-card">
       <div class="surface-card-body">
         <div class="d-flex justify-content-between align-items-start mb-2">
@@ -24,21 +28,52 @@
         <div class="mb-3"><span class="text-secondary small">Passengers</span>
           <ul class="mb-0 ps-3">
             {% for p in r.passengers.all %}
-            <li>{{ p.employee.full_name }} → {{ p.destination_label }} <span class="text-secondary">({{ p.get_status_display }})</span></li>
+            <li>
+              {{ p.employee.full_name }} → {{ p.destination_label }}
+              <span class="text-secondary">({{ p.get_status_display }})</span>
+              {% if r.status == 'ready' or r.status == 'driver_accepted' or r.status == 'in_progress' %}
+                {% if p.status == 'confirmed' %}
+                <form method="post" action="{% url 'transport:passenger_boarding' r.pk p.pk %}" class="d-inline ms-1">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{% url 'transport:driver_portal' %}">
+                  <button type="submit" class="btn btn-sm btn-light">Boarding</button>
+                </form>
+                {% endif %}
+                {% if p.status == 'confirmed' or p.status == 'boarding' %}
+                <form method="post" action="{% url 'transport:passenger_onboard' r.pk p.pk %}" class="d-inline ms-1">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{% url 'transport:driver_portal' %}">
+                  <button type="submit" class="btn btn-sm btn-light">On board</button>
+                </form>
+                {% endif %}
+              {% endif %}
+              {% if r.status == 'in_progress' and p.status != 'arrived' and p.status != 'cancelled' and p.status != 'no_show' and p.status != 'rejected' %}
+              <form method="post" action="{% url 'transport:passenger_arrived' r.pk p.pk %}" class="d-inline ms-1" data-arrive-form="{{ p.id }}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{% url 'transport:driver_portal' %}">
+                <button type="submit" class="btn btn-sm btn-light">Arrived</button>
+              </form>
+              {% endif %}
+            </li>
             {% endfor %}
           </ul>
         </div>
-        <div class="d-flex flex-wrap gap-2">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
           <a href="{% url 'transport:ride_detail' r.pk %}" class="btn btn-light btn-sm">Open</a>
           {% if r.status == 'driver_pending' %}
           <form method="post" action="{% url 'transport:driver_accept' r.pk %}">{% csrf_token %}<button class="btn btn-amber btn-sm">Accept assignment</button></form>
           <form method="post" action="{% url 'transport:driver_decline' r.pk %}">{% csrf_token %}<button class="btn btn-light btn-sm text-danger">Decline</button></form>
           {% endif %}
           {% if r.status == 'ready' or r.status == 'driver_accepted' %}
-          <form method="post" action="{% url 'transport:ride_start' r.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{% url 'transport:driver_portal' %}"><button class="btn btn-amber btn-sm"><i class="bi bi-play-fill me-1"></i>Start journey</button></form>
+          <form method="post" action="{% url 'transport:ride_start' r.pk %}" data-start-form="{{ r.id }}">{% csrf_token %}<input type="hidden" name="next" value="{% url 'transport:driver_portal' %}"><button class="btn btn-amber btn-sm"><i class="bi bi-play-fill me-1"></i>Start journey</button></form>
+          {% endif %}
+          {% if r.status == 'in_progress' or r.status == 'ready' or r.status == 'driver_accepted' %}
+          <button type="button" class="btn btn-ink btn-sm" data-share-loc="{{ r.id }}">
+            <i class="bi bi-geo-alt me-1"></i><span data-share-label>Share location</span>
+          </button>
           {% endif %}
           {% if r.status == 'in_progress' %}
-          <form method="post" action="{% url 'transport:ride_complete' r.pk %}">{% csrf_token %}<button class="btn btn-ink btn-sm">End trip</button></form>
+          <form method="post" action="{% url 'transport:ride_complete' r.pk %}">{% csrf_token %}<button class="btn btn-light btn-sm">End trip</button></form>
           {% endif %}
         </div>
       </div>
@@ -48,4 +83,159 @@
   <div class="col-12"><div class="empty-state surface-card py-5"><i class="bi bi-steering-wheel"></i>No active assignments.</div></div>
 {% endfor %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{{ trackable_json|json_script:"driver-trackable-data" }}
+<script>
+(function () {
+  const trackable = JSON.parse(document.getElementById("driver-trackable-data").textContent || "[]");
+  const byId = Object.fromEntries(trackable.map((r) => [String(r.id), r]));
+  const radius = {{ geofence_radius|default:100 }};
+  const csrf = (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/) || [])[1] || "";
+  const statusEl = document.getElementById("gpsStatus");
+  const hintEl = document.getElementById("gpsHintBanner");
+  const watchers = {};
+
+  function setStatus(msg) {
+    if (statusEl) statusEl.textContent = msg || "";
+  }
+
+  function showHint(html) {
+    if (!hintEl) return;
+    if (!html) {
+      hintEl.classList.add("d-none");
+      hintEl.innerHTML = "";
+      return;
+    }
+    hintEl.innerHTML = html;
+    hintEl.classList.remove("d-none");
+  }
+
+  function highlightStart(rideId, near) {
+    const form = document.querySelector('[data-start-form="' + rideId + '"]');
+    if (!form) return;
+    const btn = form.querySelector("button");
+    if (!btn) return;
+    if (near) {
+      btn.classList.add("btn-amber");
+      btn.style.boxShadow = "0 0 0 3px rgba(234, 179, 8, 0.35)";
+      btn.title = "Near origin — confirm Start";
+    } else {
+      btn.style.boxShadow = "";
+      btn.title = "";
+    }
+  }
+
+  function highlightArrive(passengerId, near) {
+    const form = document.querySelector('[data-arrive-form="' + passengerId + '"]');
+    if (!form) return;
+    const btn = form.querySelector("button");
+    if (!btn) return;
+    if (near) {
+      btn.classList.add("btn-amber");
+      btn.style.boxShadow = "0 0 0 3px rgba(234, 179, 8, 0.35)";
+      btn.title = "Near destination — confirm Arrived";
+    } else {
+      btn.style.boxShadow = "";
+      btn.title = "";
+    }
+  }
+
+  async function sendPing(ride, pos) {
+    const body = {
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      accuracy_m: pos.coords.accuracy,
+      speed_kmh: pos.coords.speed != null && pos.coords.speed >= 0
+        ? (pos.coords.speed * 3.6)
+        : null,
+      source: "driver_pwa",
+    };
+    const res = await fetch(ride.ping_url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "X-CSRFToken": csrf,
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setStatus(data.error || "Location ping failed");
+      return;
+    }
+    const hints = data.hints || {};
+    const parts = [];
+    if (hints.near_origin) {
+      parts.push("Near origin (" + (hints.origin_distance_m || "?") + " m) — tap Start if ready");
+      highlightStart(ride.id, true);
+    } else {
+      highlightStart(ride.id, false);
+    }
+    (hints.near_passengers || []).forEach((p) => {
+      parts.push("Near " + (p.destination || "stop") + " (" + p.distance_m + " m)");
+      highlightArrive(p.passenger_id, true);
+    });
+    if (data.actions && data.actions.length) {
+      parts.push(data.actions.map((a) => a.message).join(" · "));
+      if (data.actions.some((a) => a.type === "auto_started" || a.type === "auto_arrived")) {
+        setTimeout(() => window.location.reload(), 1200);
+      }
+    }
+    showHint(parts.length ? "<strong>Geofence:</strong> " + parts.join(" · ") : "");
+    setStatus(
+      ride.reference + " · ping " + new Date(data.recorded_at || Date.now()).toLocaleTimeString() +
+      " · radius " + radius + " m"
+    );
+  }
+
+  function stopShare(rideId) {
+    if (watchers[rideId]) {
+      navigator.geolocation.clearWatch(watchers[rideId]);
+      delete watchers[rideId];
+    }
+    const btn = document.querySelector('[data-share-loc="' + rideId + '"]');
+    if (btn) {
+      btn.classList.remove("btn-amber");
+      btn.classList.add("btn-ink");
+      const label = btn.querySelector("[data-share-label]");
+      if (label) label.textContent = "Share location";
+    }
+  }
+
+  function startShare(rideId) {
+    const ride = byId[String(rideId)];
+    if (!ride) return;
+    if (!navigator.geolocation) {
+      setStatus("Geolocation is not supported in this browser.");
+      return;
+    }
+    Object.keys(watchers).forEach(stopShare);
+    const btn = document.querySelector('[data-share-loc="' + rideId + '"]');
+    if (btn) {
+      btn.classList.remove("btn-ink");
+      btn.classList.add("btn-amber");
+      const label = btn.querySelector("[data-share-label]");
+      if (label) label.textContent = "Sharing… tap to stop";
+    }
+    setStatus("Requesting location permission…");
+    watchers[rideId] = navigator.geolocation.watchPosition(
+      (pos) => sendPing(ride, pos),
+      (err) => setStatus(err.message || "Location error"),
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
+    );
+  }
+
+  document.querySelectorAll("[data-share-loc]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-share-loc");
+      if (watchers[id]) stopShare(id);
+      else startShare(id);
+    });
+  });
+})();
+</script>
 {% endblock %}

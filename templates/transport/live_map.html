@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Live tracking{% endblock %}
+{% block page_title %}Live tracking{% endblock %}
+{% block page_subtitle %}Active rides · last GPS ping · planned route{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  #liveTrackingMap { height: min(70vh, 560px); border-radius: 12px; border: 1px solid rgba(0,0,0,.08); }
+  .live-ride-row.active { background: rgba(234, 88, 12, 0.08); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <a href="{% url 'transport:hub' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Hub</a>
+  </div>
+  <div class="d-flex gap-2 align-items-center flex-wrap">
+    <span class="text-secondary small">Geofence {{ geofence_radius }} m · refreshes every 12s</span>
+    <button type="button" class="btn btn-light btn-sm" id="liveRefreshBtn"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="surface-card">
+      <div class="surface-card-body pt-3">
+        <div id="liveTrackingMap"></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="surface-card">
+      <div class="surface-card-header d-flex justify-content-between align-items-center">
+        <h3 class="surface-card-title mb-0">In progress</h3>
+        <span class="chip" id="liveRideCount">0</span>
+      </div>
+      <div class="list-group list-group-flush" id="liveRideList"></div>
+      <div class="empty-state py-4 d-none" id="liveEmpty"><i class="bi bi-geo"></i>No in-progress rides.</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ rides_json|json_script:"live-rides-initial" }}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  const liveUrl = "{% url 'transport:api_live' %}";
+  const defaultLat = {{ map_default_lat }};
+  const defaultLng = {{ map_default_lng }};
+  const defaultZoom = {{ map_default_zoom }};
+  let rides = JSON.parse(document.getElementById("live-rides-initial").textContent || "[]");
+  const map = L.map("liveTrackingMap").setView([defaultLat, defaultLng], defaultZoom);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap",
+  }).addTo(map);
+  const layerGroup = L.layerGroup().addTo(map);
+  const markers = {};
+
+  function fmtTime(iso) {
+    if (!iso) return "—";
+    try { return new Date(iso).toLocaleString(); } catch (e) { return iso; }
+  }
+
+  function renderList() {
+    const list = document.getElementById("liveRideList");
+    const empty = document.getElementById("liveEmpty");
+    const count = document.getElementById("liveRideCount");
+    list.innerHTML = "";
+    count.textContent = String(rides.length);
+    empty.classList.toggle("d-none", rides.length > 0);
+    rides.forEach((r) => {
+      const a = document.createElement("a");
+      a.href = r.detail_url || "#";
+      a.className = "list-group-item list-group-item-action live-ride-row";
+      a.dataset.rideId = r.ride_id;
+      const ping = r.last_ping;
+      a.innerHTML =
+        "<div class=\"fw-semibold\">" + (r.reference || "") + "</div>" +
+        "<div class=\"small text-secondary\">" + (r.vehicle_name || r.vehicle || "Vehicle") +
+        (r.driver ? " · " + r.driver : "") + "</div>" +
+        "<div class=\"small\">" + (ping ? ("Last ping " + fmtTime(ping.recorded_at)) : "No GPS ping yet") + "</div>";
+      a.addEventListener("click", (ev) => {
+        if (ping) {
+          ev.preventDefault();
+          map.setView([ping.lat, ping.lng], 15);
+          document.querySelectorAll(".live-ride-row").forEach((el) => el.classList.remove("active"));
+          a.classList.add("active");
+        }
+      });
+      list.appendChild(a);
+    });
+  }
+
+  function drawMap() {
+    layerGroup.clearLayers();
+    Object.keys(markers).forEach((k) => delete markers[k]);
+    const bounds = [];
+    rides.forEach((r) => {
+      const geom = r.route_geometry;
+      if (geom && geom.type === "LineString" && Array.isArray(geom.coordinates) && geom.coordinates.length) {
+        const latlngs = geom.coordinates.map((c) => [c[1], c[0]]);
+        L.polyline(latlngs, { color: "#64748b", weight: 3, opacity: 0.7 }).addTo(layerGroup);
+        latlngs.forEach((ll) => bounds.push(ll));
+      }
+      if (r.origin) {
+        L.circleMarker([r.origin.lat, r.origin.lng], {
+          radius: 5, color: "#0f766e", fillColor: "#14b8a6", fillOpacity: 0.9,
+        }).bindPopup("Origin: " + (r.origin_label || "")).addTo(layerGroup);
+        bounds.push([r.origin.lat, r.origin.lng]);
+      }
+      if (r.last_ping) {
+        const m = L.marker([r.last_ping.lat, r.last_ping.lng]).bindPopup(
+          "<strong>" + r.reference + "</strong><br>" +
+          (r.vehicle || "") + "<br>" +
+          "Ping: " + fmtTime(r.last_ping.recorded_at)
+        );
+        m.addTo(layerGroup);
+        markers[r.ride_id] = m;
+        bounds.push([r.last_ping.lat, r.last_ping.lng]);
+      }
+    });
+    if (bounds.length) {
+      map.fitBounds(bounds, { padding: [28, 28], maxZoom: 14 });
+    }
+  }
+
+  async function refresh() {
+    try {
+      const res = await fetch(liveUrl, {
+        headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      rides = data.rides || [];
+      renderList();
+      drawMap();
+    } catch (e) { /* keep last snapshot */ }
+  }
+
+  document.getElementById("liveRefreshBtn").addEventListener("click", refresh);
+  renderList();
+  drawMap();
+  setInterval(refresh, 12000);
+})();
+</script>
+{% endblock %}

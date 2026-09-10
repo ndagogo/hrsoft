@@ -145,14 +145,19 @@ def _route_osrm(points: list[GeoPoint], cfg: dict) -> RouteResult | None:
 
 def haversine_km(lat1, lng1, lat2, lng2) -> Decimal:
     """Fallback straight-line distance when OSRM is unreachable."""
+    metres = haversine_metres(lat1, lng1, lat2, lng2)
+    return Decimal(str(round(metres / 1000.0, 2)))
+
+
+def haversine_metres(lat1, lng1, lat2, lng2) -> float:
+    """Great-circle distance in metres (no PostGIS required)."""
     from math import asin, cos, radians, sin, sqrt
 
-    r = 6371.0
+    r = 6371000.0
     dlat = radians(float(lat2) - float(lat1))
     dlng = radians(float(lng2) - float(lng1))
     a = sin(dlat / 2) ** 2 + cos(radians(float(lat1))) * cos(radians(float(lat2))) * sin(dlng / 2) ** 2
-    km = 2 * r * asin(sqrt(a))
-    return Decimal(str(round(km, 2)))
+    return 2 * r * asin(sqrt(a))
 
 
 def estimate_route_or_fallback(points: list[GeoPoint]) -> RouteResult:

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Transport policy{% endblock %}
+{% block page_title %}Transport policy{% endblock %}
+{% block page_subtitle %}Geofence, carpool deviation, approvals &amp; cost settings{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+  <div>
+    <h2 class="section-heading">Transportation policy</h2>
+    <p class="section-subtext mb-0">Org-wide defaults for rides, carpool, GPS and cancellation rules.</p>
+  </div>
+  <a href="{% url 'transport:hub' %}" class="btn btn-light btn-sm">Hub</a>
+</div>
+
+<form method="post" class="surface-card" style="max-width:720px;">
+  {% csrf_token %}
+  <div class="surface-card-body">
+    <div class="row g-3">
+      <div class="col-md-8">
+        <label class="form-label small fw-semibold">Policy name</label>
+        {{ form.name }}
+      </div>
+      <div class="col-md-4 d-flex align-items-end">
+        <div class="form-check mb-2">
+          {{ form.is_active }}
+          <label class="form-check-label" for="{{ form.is_active.id_for_label }}">Active</label>
+        </div>
+      </div>
+
+      <div class="col-12"><hr class="my-1"><div class="text-secondary small fw-semibold text-uppercase">Approvals</div></div>
+      <div class="col-md-4">
+        <div class="form-check">{{ form.require_manager_approval }}
+          <label class="form-check-label" for="{{ form.require_manager_approval.id_for_label }}">Manager approval</label></div>
+      </div>
+      <div class="col-md-4">
+        <div class="form-check">{{ form.require_transport_approval }}
+          <label class="form-check-label" for="{{ form.require_transport_approval.id_for_label }}">Transport approval</label></div>
+      </div>
+      <div class="col-md-4">
+        <div class="form-check">{{ form.require_driver_acceptance }}
+          <label class="form-check-label" for="{{ form.require_driver_acceptance.id_for_label }}">Driver acceptance</label></div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Min booking notice (hours)</label>
+        {{ form.min_booking_notice_hours }}
+      </div>
+      <div class="col-md-6 d-flex align-items-end">
+        <div class="form-check mb-2">{{ form.require_cancel_reason_after_approval }}
+          <label class="form-check-label" for="{{ form.require_cancel_reason_after_approval.id_for_label }}">Require cancel reason after approval</label></div>
+      </div>
+
+      <div class="col-12"><hr class="my-1"><div class="text-secondary small fw-semibold text-uppercase">Carpool &amp; routing</div></div>
+      <div class="col-md-4 d-flex align-items-end">
+        <div class="form-check mb-2">{{ form.allow_carpooling }}
+          <label class="form-check-label" for="{{ form.allow_carpooling.id_for_label }}">Allow carpooling</label></div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">Max route deviation %</label>
+        {{ form.max_route_deviation_percent }}
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">Estimated cost / km (₦)</label>
+        {{ form.estimated_cost_per_km }}
+      </div>
+
+      <div class="col-12"><hr class="my-1"><div class="text-secondary small fw-semibold text-uppercase">GPS / geofence</div></div>
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">Geofence radius (m)</label>
+        {{ form.geofence_radius_metres }}
+      </div>
+      <div class="col-md-4 d-flex align-items-end">
+        <div class="form-check mb-2">{{ form.auto_start_enabled }}
+          <label class="form-check-label" for="{{ form.auto_start_enabled.id_for_label }}">Auto-start near origin</label></div>
+      </div>
+      <div class="col-md-4 d-flex align-items-end">
+        <div class="form-check mb-2">{{ form.auto_arrival_enabled }}
+          <label class="form-check-label" for="{{ form.auto_arrival_enabled.id_for_label }}">Auto-arrival near stop</label></div>
+      </div>
+    </div>
+    {% if form.errors %}
+    <div class="alert alert-danger mt-3 mb-0 small">{{ form.errors }}</div>
+    {% endif %}
+  </div>
+  <div class="surface-card-body border-top d-flex gap-2">
+    <button type="submit" class="btn btn-amber">Save policy</button>
+    <a href="{% url 'transport:hub' %}" class="btn btn-light">Cancel</a>
+  </div>
+</form>
+{% endblock %}

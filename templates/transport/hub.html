@@ -10,10 +10,16 @@
     <p class="section-subtext mb-0">Request official trips, join carpools, manage vehicles and drivers.</p>
   </div>
   <div class="d-flex gap-2 flex-wrap">
+    {% if can_manage %}<a href="{% url 'transport:policy' %}" class="btn btn-light btn-sm"><i class="bi bi-sliders me-1"></i>Policy</a>{% endif %}
+    {% if can_view %}<a href="{% url 'transport:schedule' %}" class="btn btn-light btn-sm"><i class="bi bi-calendar3 me-1"></i>Schedule</a>{% endif %}
     {% if is_driver %}<a href="{% url 'transport:driver_portal' %}" class="btn btn-light btn-sm"><i class="bi bi-steering-wheel me-1"></i>Driver portal</a>{% endif %}
+    {% if can_live %}<a href="{% url 'transport:live_map' %}" class="btn btn-light btn-sm"><i class="bi bi-radar me-1"></i>Live map</a>{% endif %}
     {% if can_approve %}<a href="{% url 'transport:approvals' %}" class="btn btn-light btn-sm"><i class="bi bi-clipboard-check me-1"></i>Approvals</a>{% endif %}
     {% if can_history %}<a href="{% url 'transport:history' %}" class="btn btn-light btn-sm"><i class="bi bi-clock-history me-1"></i>History</a>{% endif %}
+    {% if can_view %}<a href="{% url 'transport:analytics' %}" class="btn btn-light btn-sm"><i class="bi bi-bar-chart me-1"></i>Analytics</a>{% endif %}
     {% if can_view %}<a href="{% url 'transport:vehicles' %}" class="btn btn-light btn-sm"><i class="bi bi-truck me-1"></i>Fleet</a>{% endif %}
+    {% if can_view %}<a href="{% url 'transport:fuel_list' %}" class="btn btn-light btn-sm"><i class="bi bi-fuel-pump me-1"></i>Fuel</a>{% endif %}
+    {% if can_view %}<a href="{% url 'transport:maintenance_list' %}" class="btn btn-light btn-sm"><i class="bi bi-wrench me-1"></i>Maintenance</a>{% endif %}
     {% if can_create %}<a href="{% url 'transport:ride_create' %}" class="btn btn-amber btn-sm"><i class="bi bi-plus-lg me-1"></i>Request ride</a>{% endif %}
     {% if can_manage %}<a href="{% url 'transport:shuttle_create' %}" class="btn btn-light btn-sm"><i class="bi bi-bus-front me-1"></i>New shuttle</a>{% endif %}
   </div>
@@ -25,6 +31,24 @@
   <div class="col-md-3">{% include "partials/_stat_card.html" with eyebrow="Drivers" value=stats.drivers icon="bi-person-badge" accent="teal" %}</div>
   <div class="col-md-3">{% include "partials/_stat_card.html" with eyebrow="Active rides" value=stats.active_rides icon="bi-signpost-2" accent="amber" %}</div>
   <div class="col-md-3">{% include "partials/_stat_card.html" with eyebrow="Pending approval" value=stats.pending_approvals icon="bi-hourglass-split" accent="violet" %}</div>
+</div>
+{% endif %}
+
+{% if due_reminders %}
+<div class="surface-card mb-4">
+  <div class="surface-card-header d-flex justify-content-between align-items-center">
+    <h3 class="surface-card-title mb-0">Fleet due soon / overdue</h3>
+    <a href="{% url 'transport:maintenance_list' %}" class="btn btn-sm btn-light">Maintenance</a>
+  </div>
+  <div class="surface-card-body d-flex flex-wrap gap-2">
+    {% for item in due_reminders %}
+    <a href="{% url 'transport:vehicle_detail' item.vehicle_id %}" class="chip text-decoration-none {% if item.status == 'overdue' %}text-danger{% else %}text-warning{% endif %}">
+      {% if item.status == 'overdue' %}Overdue{% else %}Due soon{% endif %}:
+      {{ item.vehicle.registration_number }} — {{ item.label|truncatechars:32 }}
+      {% if item.due_date %} · {{ item.due_date|date:"M d" }}{% endif %}
+    </a>
+    {% endfor %}
+  </div>
 </div>
 {% endif %}
 
@@ -44,7 +68,12 @@
               <td><a href="{% url 'transport:ride_detail' r.pk %}" class="fw-semibold text-decoration-none">{{ r.reference }}</a></td>
               <td>{{ r.scheduled_departure|date:"M d, H:i" }}</td>
               <td>{{ r.vehicle.registration_number|default:"—" }}</td>
-              <td><span class="status-pill status-{{ r.status }}">{{ r.get_status_display }}</span></td>
+              <td>
+                <span class="status-pill status-{{ r.status }}">{{ r.get_status_display }}</span>
+                {% if r.status == 'in_progress' %}
+                <a href="{% url 'transport:ride_journey' r.pk %}" class="btn btn-sm btn-light ms-1">Live</a>
+                {% endif %}
+              </td>
             </tr>
           {% empty %}
             <tr><td colspan="4"><div class="empty-state"><i class="bi bi-signpost"></i>No rides yet.</div></td></tr>

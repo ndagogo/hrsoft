@@ -11,19 +11,25 @@ from django.views.decorators.http import require_GET, require_POST
 from apps.core.permissions import permission_required, user_has_permission
 
 from .forms import (
+    CancelRideForm,
     DriverForm,
+    FuelEntryForm,
     JoinRequestForm,
+    MaintenanceRecordForm,
     ReviewForm,
     RideRequestForm,
     ShuttleRideForm,
+    TransportationPolicyForm,
     VehicleDocumentForm,
     VehicleForm,
     make_shuttle_passenger_formset,
 )
 from .models import (
     Driver,
+    FuelEntry,
     JoinRequest,
     JoinRequestStatus,
+    MaintenanceRecord,
     Ride,
     RideApprovalStep,
     RideEvent,
@@ -32,6 +38,7 @@ from .models import (
     RideStatus,
     RideType,
     StepStatus,
+    TransportationPolicy,
     Vehicle,
 )
 from . import services
@@ -92,6 +99,10 @@ def hub(request):
     can_manage = user_has_permission(request.user, "manage_transport")
     can_view = can_manage or user_has_permission(request.user, "view_transport")
     can_history = _can_view_transport_history(request.user)
+    can_live = (
+        can_manage
+        or user_has_permission(request.user, "view_live_tracking")
+    )
     emp = _employee_or_none(request.user)
     driver = _driver_or_none(request.user)
 
@@ -115,6 +126,7 @@ def hub(request):
     ).order_by("scheduled_departure")[:12]
 
     stats = {}
+    due_reminders = []
     if can_view or can_manage:
         stats = {
             "vehicles": Vehicle.objects.filter(is_active=True).count(),
@@ -123,30 +135,83 @@ def hub(request):
                 status__in=services.ACTIVE_RIDE_STATUSES
             ).count(),
             "pending_approvals": Ride.objects.filter(status=RideStatus.PENDING_APPROVAL).count(),
+            "in_progress": Ride.objects.filter(status=RideStatus.IN_PROGRESS).count(),
         }
+        due_reminders = services.fleet_due_items()[:12]
 
     return render(request, "transport/hub.html", {
         "can_manage": can_manage,
         "can_view": can_view or can_manage,
         "can_history": can_history,
+        "can_live": can_live,
         "can_create": user_has_permission(request.user, "create_ride") or can_manage,
         "can_approve": user_has_permission(request.user, "approve_transport") or can_manage,
         "is_driver": bool(driver),
         "my_rides": my_rides,
         "open_carpools": open_carpools,
         "stats": stats,
+        "due_reminders": due_reminders,
         "employee": emp,
+    })
+
+
+@login_required
+@permission_required("manage_transport")
+def policy_edit(request):
+    policy = TransportationPolicy.current()
+    if request.method == "POST":
+        form = TransportationPolicyForm(request.POST, instance=policy)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Transportation policy updated.")
+            return redirect("transport:policy")
+        messages.error(request, "Could not save policy. Check the form.")
+    else:
+        form = TransportationPolicyForm(instance=policy)
+    return render(request, "transport/policy.html", {
+        "form": form,
+        "policy": policy,
+    })
+
+
+@login_required
+@permission_required("view_transport")
+def schedule(request):
+    vehicle_id = request.GET.get("vehicle") or ""
+    vehicles = Vehicle.objects.filter(is_active=True).order_by("name")
+    vid = None
+    if vehicle_id.isdigit():
+        vid = int(vehicle_id)
+    import json
+    events = services.schedule_calendar_events(vehicle_id=vid)
+    return render(request, "transport/schedule.html", {
+        "vehicles": vehicles,
+        "selected_vehicle": vid,
+        "events_json": json.dumps(events),
+        "can_manage": user_has_permission(request.user, "manage_transport"),
     })
 
 
 @login_required
 @permission_required("view_transport")
 def vehicle_list(request):
-    vehicles = Vehicle.objects.select_related("branch").all()
+    vehicles = list(Vehicle.objects.select_related("branch").all())
+    due_by_vehicle = {}
+    for item in services.fleet_due_items():
+        due_by_vehicle.setdefault(item["vehicle_id"], []).append(item)
+    for v in vehicles:
+        v.due_chips = []
+        for item in due_by_vehicle.get(v.pk, []):
+            prefix = "Overdue" if item["status"] == "overdue" else "Due soon"
+            short = item["label"]
+            if len(short) > 36:
+                short = short[:33] + "…"
+            v.due_chips.append({"text": f"{prefix}: {short}", "status": item["status"]})
     return render(request, "transport/vehicles.html", {
         "vehicles": vehicles,
         "can_manage": user_has_permission(request.user, "manage_transport"),
         "form": VehicleForm() if user_has_permission(request.user, "manage_transport") else None,
+        "due_reminders": services.fleet_due_items()[:15],
     })
 
 
@@ -180,11 +245,25 @@ def vehicle_edit(request, pk):
 @login_required
 @permission_required("view_transport")
 def vehicle_detail(request, pk):
-    vehicle = get_object_or_404(Vehicle.objects.prefetch_related("documents", "rides"), pk=pk)
+    vehicle = get_object_or_404(
+        Vehicle.objects.prefetch_related(
+            "documents",
+            "fuel_entries__driver__employee__user",
+            "maintenance_records",
+            "rides",
+        ),
+        pk=pk,
+    )
+    can_manage = user_has_permission(request.user, "manage_transport")
     return render(request, "transport/vehicle_detail.html", {
         "vehicle": vehicle,
-        "can_manage": user_has_permission(request.user, "manage_transport"),
-        "doc_form": VehicleDocumentForm() if user_has_permission(request.user, "manage_transport") else None,
+        "can_manage": can_manage,
+        "doc_form": VehicleDocumentForm() if can_manage else None,
+        "fuel_form": FuelEntryForm(vehicle=vehicle) if can_manage else None,
+        "maint_form": MaintenanceRecordForm(vehicle=vehicle) if can_manage else None,
+        "fuel_entries": vehicle.fuel_entries.all()[:20],
+        "maintenance_records": vehicle.maintenance_records.all()[:20],
+        "due_chips": services.vehicle_due_chips(vehicle),
         "upcoming": vehicle.rides.filter(
             status__in=services.ACTIVE_RIDE_STATUSES + [RideStatus.PENDING_APPROVAL]
         ).order_by("scheduled_departure")[:10],
@@ -205,6 +284,150 @@ def vehicle_document_add(request, pk):
     else:
         messages.error(request, "Could not upload document.")
     return redirect("transport:vehicle_detail", pk=pk)
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 — Fuel & maintenance
+# ---------------------------------------------------------------------------
+
+@login_required
+@permission_required("view_transport")
+def fuel_list(request):
+    entries = (
+        FuelEntry.objects.select_related("vehicle", "driver__employee__user", "recorded_by")
+        .all()[:200]
+    )
+    can_manage = user_has_permission(request.user, "manage_transport")
+    return render(request, "transport/fuel_list.html", {
+        "entries": entries,
+        "can_manage": can_manage,
+        "form": FuelEntryForm() if can_manage else None,
+        "due_reminders": services.fleet_due_items()[:10],
+    })
+
+
+@login_required
+@permission_required("manage_transport")
+def fuel_create(request):
+    vehicle_id = request.POST.get("vehicle") or request.GET.get("vehicle")
+    vehicle = None
+    if vehicle_id:
+        vehicle = Vehicle.objects.filter(pk=vehicle_id).first()
+    if request.method == "POST":
+        form = FuelEntryForm(request.POST, request.FILES, vehicle=vehicle)
+        if form.is_valid():
+            entry = form.save(commit=False)
+            entry.recorded_by = request.user
+            if entry.total is None and entry.litres is not None and entry.price_per_litre is not None:
+                entry.total = entry.litres * entry.price_per_litre
+            entry.save()
+            messages.success(request, "Fuel entry saved.")
+            if request.POST.get("next") == "vehicle" and entry.vehicle_id:
+                return redirect("transport:vehicle_detail", pk=entry.vehicle_id)
+            return redirect("transport:fuel_list")
+        messages.error(request, "Could not save fuel entry.")
+        if vehicle:
+            return redirect("transport:vehicle_detail", pk=vehicle.pk)
+        return redirect("transport:fuel_list")
+    return redirect("transport:fuel_list")
+
+
+@login_required
+@permission_required("manage_transport")
+@require_POST
+def fuel_delete(request, pk):
+    entry = get_object_or_404(FuelEntry, pk=pk)
+    vehicle_id = entry.vehicle_id
+    entry.delete()
+    messages.success(request, "Fuel entry deleted.")
+    if request.POST.get("next") == "vehicle":
+        return redirect("transport:vehicle_detail", pk=vehicle_id)
+    return redirect("transport:fuel_list")
+
+
+@login_required
+@permission_required("view_transport")
+def maintenance_list(request):
+    records = (
+        MaintenanceRecord.objects.select_related("vehicle", "recorded_by")
+        .all()[:200]
+    )
+    can_manage = user_has_permission(request.user, "manage_transport")
+    return render(request, "transport/maintenance_list.html", {
+        "records": records,
+        "can_manage": can_manage,
+        "form": MaintenanceRecordForm() if can_manage else None,
+        "due_reminders": services.fleet_due_items()[:10],
+    })
+
+
+@login_required
+@permission_required("manage_transport")
+def maintenance_create(request):
+    vehicle_id = request.POST.get("vehicle") or request.GET.get("vehicle")
+    vehicle = None
+    if vehicle_id:
+        vehicle = Vehicle.objects.filter(pk=vehicle_id).first()
+    if request.method == "POST":
+        form = MaintenanceRecordForm(request.POST, request.FILES, vehicle=vehicle)
+        if form.is_valid():
+            rec = form.save(commit=False)
+            rec.recorded_by = request.user
+            rec.save()
+            messages.success(request, "Maintenance record saved.")
+            if request.POST.get("next") == "vehicle" and rec.vehicle_id:
+                return redirect("transport:vehicle_detail", pk=rec.vehicle_id)
+            return redirect("transport:maintenance_list")
+        messages.error(request, "Could not save maintenance record.")
+        if vehicle:
+            return redirect("transport:vehicle_detail", pk=vehicle.pk)
+        return redirect("transport:maintenance_list")
+    return redirect("transport:maintenance_list")
+
+
+@login_required
+@permission_required("manage_transport")
+@require_POST
+def maintenance_delete(request, pk):
+    rec = get_object_or_404(MaintenanceRecord, pk=pk)
+    vehicle_id = rec.vehicle_id
+    rec.delete()
+    messages.success(request, "Maintenance record deleted.")
+    if request.POST.get("next") == "vehicle":
+        return redirect("transport:vehicle_detail", pk=vehicle_id)
+    return redirect("transport:maintenance_list")
+
+
+# ---------------------------------------------------------------------------
+# Phase 6 — Analytics
+# ---------------------------------------------------------------------------
+
+@login_required
+def transport_analytics(request):
+    can_manage = user_has_permission(request.user, "manage_transport")
+    can_view = can_manage or user_has_permission(request.user, "view_transport")
+    if not can_view:
+        messages.error(request, "You don't have permission to view transport analytics.")
+        return redirect("transport:hub")
+
+    range_key = (request.GET.get("range") or "this_month").strip().lower()
+    date_from = parse_date(request.GET.get("date_from") or "")
+    date_to = parse_date(request.GET.get("date_to") or "")
+    start, end, range_key = services.resolve_analytics_range(range_key, date_from, date_to)
+    stats = services.transport_analytics(start, end)
+
+    import json
+    return render(request, "transport/analytics.html", {
+        "can_manage": can_manage,
+        "stats": stats,
+        "range_key": range_key,
+        "date_from": start.isoformat(),
+        "date_to": end.isoformat(),
+        "month_labels_json": json.dumps(stats["month_labels"]),
+        "month_counts_json": json.dumps(stats["month_counts"]),
+        "status_labels_json": json.dumps(stats["status_labels"]),
+        "status_counts_json": json.dumps(stats["status_counts"]),
+    })
 
 
 @login_required
@@ -618,6 +841,23 @@ def ride_detail(request, pk):
             is_assigned_driver or can_manage
         ),
         "can_complete": ride.status == RideStatus.IN_PROGRESS and (is_assigned_driver or can_manage),
+        "can_board": ride.status in (
+            RideStatus.READY, RideStatus.DRIVER_ACCEPTED, RideStatus.IN_PROGRESS,
+        ) and (is_assigned_driver or can_manage),
+        "can_cancel": (
+            services.user_can_cancel_ride(request.user, ride)
+            and ride.status not in (
+                RideStatus.COMPLETED, RideStatus.CANCELLED, RideStatus.ABORTED, RideStatus.IN_PROGRESS,
+            )
+        ),
+        "can_leave": (
+            is_passenger
+            and ride.status != RideStatus.IN_PROGRESS
+            and ride.status not in (
+                RideStatus.COMPLETED, RideStatus.CANCELLED, RideStatus.ABORTED,
+            )
+            and not is_requester  # requester cancels whole ride instead
+        ),
         "can_join": (
             emp and ride.allow_carpool
             and not is_passenger
@@ -627,8 +867,17 @@ def ride_detail(request, pk):
             )
         ),
         "is_organizer": is_organizer,
+        "is_passenger": is_passenger,
+        "show_journey_link": ride.status == RideStatus.IN_PROGRESS and (
+            is_passenger or is_requester or is_assigned_driver or can_manage
+        ),
+        "cancel_reason_required": (
+            TransportationPolicy.current().require_cancel_reason_after_approval
+            and ride.status not in (RideStatus.DRAFT, RideStatus.SUBMITTED)
+        ),
         "join_form": JoinRequestForm(),
         "review_form": ReviewForm(),
+        "cancel_form": CancelRideForm(),
         "pending_joins": ride.join_requests.filter(
             status__in=[
                 JoinRequestStatus.PENDING,
@@ -663,9 +912,25 @@ def ride_cancel(request, pk):
     try:
         services.cancel_ride(ride, request.user, reason=reason)
         messages.success(request, "Ride cancelled.")
-    except ValueError as exc:
+    except (ValueError, PermissionError) as exc:
         messages.error(request, str(exc))
     return redirect("transport:ride_detail", pk=pk)
+
+
+@login_required
+@require_POST
+def passenger_leave(request, pk):
+    ride = get_object_or_404(Ride, pk=pk)
+    emp = _employee_or_none(request.user)
+    if not emp:
+        messages.error(request, "Employee profile required.")
+        return redirect("transport:ride_detail", pk=pk)
+    try:
+        services.passenger_leave_ride(ride, emp, request.user, reason=request.POST.get("reason", ""))
+        messages.success(request, "You left this ride.")
+    except (ValueError, PermissionError) as exc:
+        messages.error(request, str(exc))
+    return redirect("transport:hub")
 
 
 @login_required
@@ -703,16 +968,53 @@ def driver_portal(request):
     if not driver and not user_has_permission(request.user, "manage_transport"):
         messages.error(request, "You are not registered as a driver.")
         return redirect("transport:hub")
-    qs = Ride.objects.select_related("vehicle", "requester__user").prefetch_related("passengers__employee__user")
+    qs = Ride.objects.select_related("vehicle", "requester__user").prefetch_related(
+        "passengers__employee__user", "stops",
+    )
     if driver:
         assigned = qs.filter(driver=driver).exclude(
             status__in=[RideStatus.COMPLETED, RideStatus.CANCELLED, RideStatus.REJECTED, RideStatus.ABORTED, RideStatus.DRAFT]
         ).order_by("scheduled_departure")
     else:
         assigned = qs.filter(status__in=services.ACTIVE_RIDE_STATUSES).order_by("scheduled_departure")[:20]
+
+    policy = TransportationPolicy.current()
+    trackable = [
+        {
+            "id": r.id,
+            "reference": r.reference,
+            "status": r.status,
+            "origin_lat": float(r.origin_lat) if r.origin_lat is not None else None,
+            "origin_lng": float(r.origin_lng) if r.origin_lng is not None else None,
+            "ping_url": f"/transport/api/rides/{r.id}/location/",
+            "passengers": [
+                {
+                    "id": p.id,
+                    "name": p.employee.full_name,
+                    "destination": p.destination_label,
+                    "status": p.status,
+                    "lat": float(p.destination_lat) if p.destination_lat is not None else (
+                        float(p.stop.lat) if p.stop_id and p.stop and p.stop.lat is not None else None
+                    ),
+                    "lng": float(p.destination_lng) if p.destination_lng is not None else (
+                        float(p.stop.lng) if p.stop_id and p.stop and p.stop.lng is not None else None
+                    ),
+                }
+                for p in r.passengers.all()
+            ],
+        }
+        for r in assigned
+        if r.status in (RideStatus.READY, RideStatus.DRIVER_ACCEPTED, RideStatus.IN_PROGRESS)
+    ]
+
     return render(request, "transport/driver_portal.html", {
         "driver": driver,
         "assigned": assigned,
+        "trackable_json": trackable,
+        "geofence_radius": policy.geofence_radius_metres,
+        "auto_start_enabled": policy.auto_start_enabled,
+        "auto_arrival_enabled": policy.auto_arrival_enabled,
+        **_map_defaults(),
     })
 
 
@@ -774,7 +1076,95 @@ def passenger_arrived(request, pk, passenger_id):
         messages.success(request, f"Marked arrived: {passenger.destination_label}")
     except ValueError as exc:
         messages.error(request, str(exc))
+    next_url = request.POST.get("next") or ""
+    if next_url.startswith("/"):
+        return redirect(next_url)
     return redirect("transport:ride_detail", pk=pk)
+
+
+@login_required
+@require_POST
+def passenger_boarding(request, pk, passenger_id):
+    ride = get_object_or_404(Ride, pk=pk)
+    passenger = get_object_or_404(RidePassenger, pk=passenger_id, ride=ride)
+    try:
+        services.mark_passenger_boarding(ride, passenger, request.user)
+        messages.success(request, f"Boarding: {passenger.employee}")
+    except (ValueError, PermissionError) as exc:
+        messages.error(request, str(exc))
+    next_url = request.POST.get("next") or ""
+    if next_url.startswith("/"):
+        return redirect(next_url)
+    return redirect("transport:ride_detail", pk=pk)
+
+
+@login_required
+@require_POST
+def passenger_onboard(request, pk, passenger_id):
+    ride = get_object_or_404(Ride, pk=pk)
+    passenger = get_object_or_404(RidePassenger, pk=passenger_id, ride=ride)
+    try:
+        services.mark_passenger_onboard(ride, passenger, request.user)
+        messages.success(request, f"On board: {passenger.employee}")
+    except (ValueError, PermissionError) as exc:
+        messages.error(request, str(exc))
+    next_url = request.POST.get("next") or ""
+    if next_url.startswith("/"):
+        return redirect(next_url)
+    return redirect("transport:ride_detail", pk=pk)
+
+
+@login_required
+def ride_journey(request, pk):
+    """Passenger-facing live journey status + map."""
+    ride = get_object_or_404(
+        Ride.objects.select_related("vehicle", "driver__employee__user").prefetch_related("stops"),
+        pk=pk,
+    )
+    emp = _employee_or_none(request.user)
+    driver = _driver_or_none(request.user)
+    can_manage = user_has_permission(request.user, "manage_transport")
+    is_passenger = emp and ride.passengers.filter(employee=emp).exists()
+    is_requester = emp and ride.requester_id == emp.id
+    is_assigned_driver = driver and ride.driver_id == driver.id
+    if not (can_manage or is_passenger or is_requester or is_assigned_driver
+            or user_has_permission(request.user, "view_live_tracking")):
+        messages.error(request, "You cannot view this journey.")
+        return redirect("transport:hub")
+
+    my_passenger = None
+    if emp:
+        my_passenger = ride.passengers.filter(employee=emp).first()
+
+    import json
+    payload = services.passenger_journey_payload(ride)
+    return render(request, "transport/journey.html", {
+        "ride": ride,
+        "my_passenger": my_passenger,
+        "payload": payload,
+        "payload_json": json.dumps(payload),
+        **_map_defaults(),
+    })
+
+
+@login_required
+@require_GET
+def api_ride_journey(request, pk):
+    """JSON poll for passenger journey page (scoped to ride participants)."""
+    ride = get_object_or_404(Ride.objects.prefetch_related("stops"), pk=pk)
+    emp = _employee_or_none(request.user)
+    driver = _driver_or_none(request.user)
+    can_manage = user_has_permission(request.user, "manage_transport")
+    allowed = (
+        can_manage
+        or user_has_permission(request.user, "view_live_tracking")
+        or (emp and ride.passengers.filter(employee=emp).exists())
+        or (emp and ride.requester_id == emp.id)
+        or (driver and ride.driver_id == driver.id)
+    )
+    if not allowed:
+        return JsonResponse({"error": "Forbidden"}, status=403)
+    return JsonResponse(services.passenger_journey_payload(ride))
 
 
 # ---------------------------------------------------------------------------
@@ -794,7 +1184,13 @@ def join_request_create(request, pk):
         messages.error(request, "Enter your destination.")
         return redirect("transport:ride_detail", pk=pk)
     try:
-        services.request_to_join(ride, emp, form.cleaned_data["destination_label"])
+        services.request_to_join(
+            ride,
+            emp,
+            form.cleaned_data["destination_label"],
+            destination_lat=form.cleaned_data.get("destination_lat"),
+            destination_lng=form.cleaned_data.get("destination_lng"),
+        )
         messages.success(request, "Join request submitted. Awaiting organizer and transport approval.")
     except ValueError as exc:
         messages.error(request, str(exc))
@@ -818,3 +1214,86 @@ def join_request_decide(request, pk, join_id, action):
     except (ValueError, PermissionError) as exc:
         messages.error(request, str(exc))
     return redirect("transport:ride_detail", pk=pk)
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — GPS / live tracking
+# ---------------------------------------------------------------------------
+
+def _can_view_live_tracking(user) -> bool:
+    return (
+        user_has_permission(user, "view_live_tracking")
+        or user_has_permission(user, "manage_transport")
+        or getattr(user, "is_superuser", False)
+    )
+
+
+@login_required
+@require_POST
+def api_location_ping(request, pk):
+    """Driver/manager posts GPS sample for an active ride."""
+    import json
+
+    ride = get_object_or_404(
+        Ride.objects.select_related("vehicle").prefetch_related("stops", "passengers__stop", "passengers__employee"),
+        pk=pk,
+    )
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    try:
+        lat = float(payload["lat"])
+        lng = float(payload["lng"])
+    except (KeyError, TypeError, ValueError):
+        return JsonResponse({"error": "lat and lng are required"}, status=400)
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        return JsonResponse({"error": "Invalid coordinates"}, status=400)
+
+    speed = payload.get("speed_kmh")
+    accuracy = payload.get("accuracy_m")
+    try:
+        speed_kmh = float(speed) if speed is not None and speed != "" else None
+        accuracy_m = float(accuracy) if accuracy is not None and accuracy != "" else None
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid speed or accuracy"}, status=400)
+
+    try:
+        _ping, result = services.record_location_ping(
+            ride,
+            request.user,
+            lat=lat,
+            lng=lng,
+            speed_kmh=speed_kmh,
+            accuracy_m=accuracy_m,
+            source=payload.get("source") or "driver_pwa",
+        )
+    except PermissionError as exc:
+        return JsonResponse({"error": str(exc)}, status=403)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    return JsonResponse(result)
+
+
+@login_required
+@require_GET
+def api_live_positions(request):
+    if not _can_view_live_tracking(request.user):
+        return JsonResponse({"error": "Forbidden"}, status=403)
+    return JsonResponse({"rides": services.live_map_payload()})
+
+
+@login_required
+def live_map(request):
+    if not _can_view_live_tracking(request.user):
+        messages.error(request, "You don't have permission to view live tracking.")
+        return redirect("transport:hub")
+    policy = TransportationPolicy.current()
+    return render(request, "transport/live_map.html", {
+        "rides_json": services.live_map_payload(),
+        "geofence_radius": policy.geofence_radius_metres,
+        "can_manage": user_has_permission(request.user, "manage_transport"),
+        **_map_defaults(),
+    })
+

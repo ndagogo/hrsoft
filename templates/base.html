@@ -145,7 +145,7 @@
         <i class="bi bi-person-badge-fill"></i> Visitors
       </a>
       {% endif %}
-      {% if 'view_transport' in perms_set or 'create_ride' in perms_set or 'manage_transport' in perms_set or 'accept_driver_assignment' in perms_set %}
+      {% if 'view_transport' in perms_set or 'create_ride' in perms_set or 'manage_transport' in perms_set or 'accept_driver_assignment' in perms_set or 'view_live_tracking' in perms_set %}
       <a href="{% url 'transport:hub' %}" class="sidebar-link {% if request.resolver_match.app_name == 'transport' %}active{% endif %}">
         <i class="bi bi-truck-front-fill"></i> Transport
       </a>

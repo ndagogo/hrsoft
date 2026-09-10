@@ -15,6 +15,9 @@
 <div class="d-flex justify-content-between mb-3 flex-wrap gap-2">
   <a href="{% url 'transport:rides' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Rides</a>
   <div class="d-flex gap-2 flex-wrap">
+    {% if show_journey_link %}
+    <a href="{% url 'transport:ride_journey' ride.pk %}" class="btn btn-ink btn-sm"><i class="bi bi-geo-alt me-1"></i>View live journey</a>
+    {% endif %}
     {% if can_submit %}
     <form method="post" action="{% url 'transport:ride_submit' ride.pk %}">{% csrf_token %}<button class="btn btn-amber btn-sm">Submit for approval</button></form>
     {% endif %}
@@ -71,8 +74,16 @@
               <td class="fw-semibold">{{ p.employee.full_name }}</td>
               <td>{{ p.destination_label }}</td>
               <td><span class="status-pill status-{{ p.status }}">{{ p.get_status_display }}</span></td>
-              <td class="text-end">
-                {% if can_complete or can_start %}
+              <td class="text-end text-nowrap">
+                {% if can_board %}
+                  {% if p.status == 'confirmed' %}
+                  <form method="post" action="{% url 'transport:passenger_boarding' ride.pk p.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-light">Boarding</button></form>
+                  {% endif %}
+                  {% if p.status == 'confirmed' or p.status == 'boarding' %}
+                  <form method="post" action="{% url 'transport:passenger_onboard' ride.pk p.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-light">On board</button></form>
+                  {% endif %}
+                {% endif %}
+                {% if can_complete or can_board %}
                   {% if p.status == 'onboard' or p.status == 'confirmed' or p.status == 'boarding' %}
                   {% if ride.status == 'in_progress' %}
                   <form method="post" action="{% url 'transport:passenger_arrived' ride.pk p.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-light">Mark arrived</button></form>
@@ -112,6 +123,7 @@
         <form method="post" action="{% url 'transport:join_request' ride.pk %}">
           {% csrf_token %}
           <div class="mb-2"><label class="form-label small fw-semibold">My destination</label>{{ join_form.destination_label }}</div>
+          {{ join_form.destination_lat }}{{ join_form.destination_lng }}
           <button class="btn btn-amber btn-sm">Request to join</button>
         </form>
       </div>
@@ -182,6 +194,34 @@
         {% endfor %}
       </div>
     </div>
+
+    {% if can_cancel %}
+    <div class="surface-card mt-3">
+      <div class="surface-card-header"><h3 class="surface-card-title">Cancel ride</h3></div>
+      <div class="surface-card-body">
+        <form method="post" action="{% url 'transport:ride_cancel' ride.pk %}" data-confirm="Cancel this ride?">
+          {% csrf_token %}
+          <label class="form-label small fw-semibold">Reason{% if cancel_reason_required %} <span class="text-danger">*</span>{% endif %}</label>
+          <input type="text" name="reason" class="form-control mb-2" {% if cancel_reason_required %}required{% endif %} placeholder="Cancellation reason" maxlength="255">
+          <button class="btn btn-sm btn-light text-danger">Cancel ride</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if can_leave %}
+    <div class="surface-card mt-3">
+      <div class="surface-card-header"><h3 class="surface-card-title">Leave this ride</h3></div>
+      <div class="surface-card-body">
+        <p class="small text-secondary">Drop your seat before the journey starts. Not available once the ride is in progress.</p>
+        <form method="post" action="{% url 'transport:passenger_leave' ride.pk %}" data-confirm="Leave this ride?">
+          {% csrf_token %}
+          <input type="text" name="reason" class="form-control mb-2" placeholder="Optional note" maxlength="255">
+          <button class="btn btn-sm btn-light text-danger">Leave ride</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
   </div>
 </div>
 {{ route_geometry_json|json_script:"route-geometry-data" }}

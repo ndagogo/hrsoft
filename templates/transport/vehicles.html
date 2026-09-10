@@ -12,11 +12,26 @@
   <div class="d-flex gap-2">
     <a href="{% url 'transport:hub' %}" class="btn btn-light btn-sm">Hub</a>
     {% if can_manage %}
+    <a href="{% url 'transport:fuel_list' %}" class="btn btn-light btn-sm">Fuel</a>
+    <a href="{% url 'transport:maintenance_list' %}" class="btn btn-light btn-sm">Maintenance</a>
     <a href="{% url 'transport:drivers' %}" class="btn btn-light btn-sm">Drivers</a>
     <button class="btn btn-amber btn-sm" data-bs-toggle="modal" data-bs-target="#newVehicleModal"><i class="bi bi-plus-lg me-1"></i>Add vehicle</button>
     {% endif %}
   </div>
 </div>
+
+{% if due_reminders %}
+<div class="surface-card mb-3">
+  <div class="surface-card-body d-flex flex-wrap gap-2 align-items-center">
+    <span class="text-secondary small fw-semibold me-1">Due soon / overdue:</span>
+    {% for item in due_reminders %}
+    <a href="{% url 'transport:vehicle_detail' item.vehicle_id %}" class="chip text-decoration-none {% if item.status == 'overdue' %}text-danger{% else %}text-warning{% endif %}">
+      {% if item.status == 'overdue' %}Overdue{% else %}Due soon{% endif %}: {{ item.vehicle.registration_number }} — {{ item.label|truncatechars:28 }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
 
 <div class="surface-card">
   <div class="table-responsive">
@@ -24,7 +39,7 @@
       <thead>
         <tr>
           <th style="width:3.5rem;"></th>
-          <th>Vehicle</th><th>Reg.</th><th>Type</th><th>Capacity</th><th>Status</th>
+          <th>Vehicle</th><th>Reg.</th><th>Type</th><th>Capacity</th><th>Status</th><th>Alerts</th>
           {% if can_manage %}<th class="text-end">Actions</th>{% endif %}
         </tr>
       </thead>
@@ -43,6 +58,13 @@
           <td>{{ v.get_vehicle_type_display }}</td>
           <td>{{ v.capacity }}</td>
           <td><span class="status-pill status-{{ v.status }}">{{ v.get_status_display }}</span></td>
+          <td>
+            {% for chip in v.due_chips %}
+            <span class="chip d-inline-block mb-1 {% if chip.status == 'overdue' %}text-danger{% else %}text-warning{% endif %}">{{ chip.text|truncatechars:40 }}</span>
+            {% empty %}
+            <span class="text-secondary small">—</span>
+            {% endfor %}
+          </td>
           {% if can_manage %}
           <td class="text-end">
             <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#editVehicle{{ v.pk }}"><i class="bi bi-pencil"></i></button>
@@ -50,7 +72,7 @@
           {% endif %}
         </tr>
       {% empty %}
-        <tr><td colspan="7"><div class="empty-state"><i class="bi bi-truck"></i>No vehicles yet.</div></td></tr>
+        <tr><td colspan="8"><div class="empty-state"><i class="bi bi-truck"></i>No vehicles yet.</div></td></tr>
       {% endfor %}
       </tbody>
     </table>

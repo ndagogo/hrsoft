@@ -5,6 +5,15 @@
 
 {% block content %}
 <a href="{% url 'transport:vehicles' %}" class="btn btn-light btn-sm mb-3"><i class="bi bi-arrow-left me-1"></i>Fleet</a>
+
+{% if due_chips %}
+<div class="d-flex flex-wrap gap-2 mb-3">
+  {% for chip in due_chips %}
+  <span class="chip {% if chip.status == 'overdue' %}text-danger{% else %}text-warning{% endif %}">{{ chip.text }}</span>
+  {% endfor %}
+</div>
+{% endif %}
+
 <div class="row g-3">
   <div class="col-lg-5">
     <div class="surface-card">
@@ -35,6 +44,49 @@
         </form>
       </div>
     </div>
+    <div class="surface-card mt-3">
+      <div class="surface-card-header"><h3 class="surface-card-title">Log fuel</h3></div>
+      <div class="surface-card-body">
+        <form method="post" action="{% url 'transport:fuel_create' %}" enctype="multipart/form-data">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="vehicle">
+          {{ fuel_form.vehicle }}
+          <div class="mb-2"><label class="form-label small fw-semibold">Date</label>{{ fuel_form.date }}</div>
+          <div class="mb-2"><label class="form-label small fw-semibold">Station</label>{{ fuel_form.station }}</div>
+          <div class="row g-2 mb-2">
+            <div class="col-6"><label class="form-label small fw-semibold">Litres</label>{{ fuel_form.litres }}</div>
+            <div class="col-6"><label class="form-label small fw-semibold">Price / L</label>{{ fuel_form.price_per_litre }}</div>
+          </div>
+          <div class="mb-2"><label class="form-label small fw-semibold">Total (optional)</label>{{ fuel_form.total }}</div>
+          <div class="mb-2"><label class="form-label small fw-semibold">Odometer</label>{{ fuel_form.odometer_km }}</div>
+          <div class="mb-2"><label class="form-label small fw-semibold">Driver</label>{{ fuel_form.driver }}</div>
+          <div class="mb-2"><label class="form-label small fw-semibold">Receipt</label>{{ fuel_form.receipt }}</div>
+          <button class="btn btn-amber btn-sm">Save fuel</button>
+        </form>
+      </div>
+    </div>
+    <div class="surface-card mt-3">
+      <div class="surface-card-header"><h3 class="surface-card-title">Log maintenance</h3></div>
+      <div class="surface-card-body">
+        <form method="post" action="{% url 'transport:maintenance_create' %}" enctype="multipart/form-data">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="vehicle">
+          {{ maint_form.vehicle }}
+          <div class="mb-2"><label class="form-label small fw-semibold">Type</label>{{ maint_form.maintenance_type }}</div>
+          <div class="mb-2"><label class="form-label small fw-semibold">Title</label>{{ maint_form.title }}</div>
+          <div class="mb-2"><label class="form-label small fw-semibold">Performed on</label>{{ maint_form.performed_on }}</div>
+          <div class="row g-2 mb-2">
+            <div class="col-6"><label class="form-label small fw-semibold">Odometer</label>{{ maint_form.odometer_km }}</div>
+            <div class="col-6"><label class="form-label small fw-semibold">Next due km</label>{{ maint_form.next_due_km }}</div>
+          </div>
+          <div class="mb-2"><label class="form-label small fw-semibold">Next due date</label>{{ maint_form.next_due_date }}</div>
+          <div class="mb-2"><label class="form-label small fw-semibold">Cost</label>{{ maint_form.cost }}</div>
+          <div class="mb-2"><label class="form-label small fw-semibold">Vendor</label>{{ maint_form.vendor }}</div>
+          <div class="mb-2"><label class="form-label small fw-semibold">Attachment</label>{{ maint_form.attachment }}</div>
+          <button class="btn btn-amber btn-sm">Save maintenance</button>
+        </form>
+      </div>
+    </div>
     {% endif %}
   </div>
   <div class="col-lg-7">
@@ -52,6 +104,71 @@
             </tr>
           {% empty %}
             <tr><td colspan="3"><div class="empty-state"><i class="bi bi-file-earmark"></i>No documents.</div></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="surface-card mb-3">
+      <div class="surface-card-header d-flex justify-content-between align-items-center">
+        <h3 class="surface-card-title mb-0">Fuel history</h3>
+        <a href="{% url 'transport:fuel_list' %}" class="btn btn-sm btn-light">All fuel</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Date</th><th>Litres</th><th>Total</th><th>Odo</th>{% if can_manage %}<th></th>{% endif %}</tr></thead>
+          <tbody>
+          {% for e in fuel_entries %}
+            <tr>
+              <td>{{ e.date|date:"M d, Y" }}</td>
+              <td>{{ e.litres }}</td>
+              <td>{{ e.total|default:"—" }}</td>
+              <td>{% if e.odometer_km %}{{ e.odometer_km }}{% else %}—{% endif %}</td>
+              {% if can_manage %}
+              <td class="text-end">
+                <form method="post" action="{% url 'transport:fuel_delete' e.pk %}" class="d-inline" onsubmit="return confirm('Delete?');">
+                  {% csrf_token %}<input type="hidden" name="next" value="vehicle">
+                  <button class="btn btn-sm btn-light text-danger"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+          {% empty %}
+            <tr><td colspan="5"><div class="empty-state"><i class="bi bi-fuel-pump"></i>No fuel entries.</div></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="surface-card mb-3">
+      <div class="surface-card-header d-flex justify-content-between align-items-center">
+        <h3 class="surface-card-title mb-0">Maintenance</h3>
+        <a href="{% url 'transport:maintenance_list' %}" class="btn btn-sm btn-light">All records</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hrms mb-0">
+          <thead><tr><th>Date</th><th>Title</th><th>Next due</th>{% if can_manage %}<th></th>{% endif %}</tr></thead>
+          <tbody>
+          {% for r in maintenance_records %}
+            <tr>
+              <td>{{ r.performed_on|date:"M d, Y" }}</td>
+              <td>{{ r.title }} <span class="text-secondary small">({{ r.get_maintenance_type_display }})</span></td>
+              <td>
+                {% if r.next_due_date %}{{ r.next_due_date|date:"M d, Y" }}{% endif %}
+                {% if r.next_due_km %}{% if r.next_due_date %} · {% endif %}{{ r.next_due_km }} km{% endif %}
+                {% if not r.next_due_date and not r.next_due_km %}—{% endif %}
+              </td>
+              {% if can_manage %}
+              <td class="text-end">
+                <form method="post" action="{% url 'transport:maintenance_delete' r.pk %}" class="d-inline" onsubmit="return confirm('Delete?');">
+                  {% csrf_token %}<input type="hidden" name="next" value="vehicle">
+                  <button class="btn btn-sm btn-light text-danger"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+          {% empty %}
+            <tr><td colspan="4"><div class="empty-state"><i class="bi bi-wrench"></i>No maintenance records.</div></td></tr>
           {% endfor %}
           </tbody>
         </table>

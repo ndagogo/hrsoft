@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Transport analytics{% endblock %}
+{% block page_title %}Transport analytics{% endblock %}
+{% block page_subtitle %}Trips, passengers, fuel &amp; fleet{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+  <div>
+    <h2 class="section-heading">Transport analytics</h2>
+    <p class="section-subtext mb-0">{{ date_from }} → {{ date_to }}</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{% url 'transport:hub' %}" class="btn btn-light btn-sm">Hub</a>
+    <a href="{% url 'transport:history' %}" class="btn btn-light btn-sm">History</a>
+  </div>
+</div>
+
+<div class="surface-card mb-4">
+  <div class="surface-card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold">Period</label>
+        <select name="range" class="form-select" id="rangeSelect">
+          <option value="this_month" {% if range_key == "this_month" %}selected{% endif %}>This month</option>
+          <option value="last_30" {% if range_key == "last_30" %}selected{% endif %}>Last 30 days</option>
+          <option value="custom" {% if range_key == "custom" %}selected{% endif %}>Custom</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold">From</label>
+        <input type="date" name="date_from" value="{{ date_from }}" class="form-control">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold">To</label>
+        <input type="date" name="date_to" value="{{ date_to }}" class="form-control">
+      </div>
+      <div class="col-md-auto">
+        <button class="btn btn-amber">Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Trips" value=stats.total_trips icon="bi-signpost-2" accent="ink" %}</div>
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Passengers" value=stats.total_passengers icon="bi-people" accent="teal" %}</div>
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Completed %" value=stats.completed_rate icon="bi-check-circle" accent="green" %}</div>
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Cancelled %" value=stats.cancelled_rate icon="bi-slash-circle" accent="rose" %}</div>
+</div>
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Distance (km)" value=stats.total_distance_km icon="bi-speedometer2" accent="amber" %}</div>
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Active vehicles" value=stats.active_vehicles icon="bi-truck" accent="ink" %}</div>
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Fuel cost" value=stats.fuel_cost icon="bi-fuel-pump" accent="violet" %}</div>
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Carpool joins" value=stats.carpool_joins icon="bi-person-plus" accent="teal" %}</div>
+</div>
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Maintenance cost" value=stats.maintenance_cost icon="bi-wrench" accent="ink" %}</div>
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Ops cost (fuel+maint)" value=stats.total_ops_cost icon="bi-cash-stack" accent="amber" %}</div>
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Est. trip cost" value=stats.estimated_trip_cost icon="bi-signpost" accent="teal" %}</div>
+  <div class="col-6 col-md-3">{% include "partials/_stat_card.html" with eyebrow="Cost / km (policy)" value=stats.cost_per_km icon="bi-speedometer" accent="violet" %}</div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title">Trips by month</h3></div>
+      <div class="surface-card-body">
+        <canvas id="tripsMonthChart" height="140"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title">Status breakdown</h3></div>
+      <div class="surface-card-body">
+        <canvas id="statusChart" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+new Chart(document.getElementById('tripsMonthChart'), {
+  type: 'bar',
+  data: {
+    labels: {{ month_labels_json|safe }},
+    datasets: [{
+      label: 'Trips',
+      data: {{ month_counts_json|safe }},
+      backgroundColor: '#f5a524',
+      borderRadius: 6
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } }
+  }
+});
+new Chart(document.getElementById('statusChart'), {
+  type: 'doughnut',
+  data: {
+    labels: {{ status_labels_json|safe }},
+    datasets: [{
+      data: {{ status_counts_json|safe }},
+      backgroundColor: ['#111a2e','#f5a524','#14b8a6','#8b5cf6','#f43f5e','#324269','#22c55e','#ea580c','#64748b','#0ea5e9','#06b6d4','#ec4899'],
+      borderWidth: 0
+    }]
+  },
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } }, cutout: '58%' }
+});
+</script>
+{% endblock %}

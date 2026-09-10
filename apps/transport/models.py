@@ -1,11 +1,7 @@
 """
-Transportation & Fleet Management — Phase 1 core models.
+Transportation & Fleet Management models.
 
-Architecture:
-  Ride  = one physical vehicle journey (not a single booking)
-  RidePassenger = independent passenger participation / journey status
-  RideStop = ordered physical stops on the route
-  RideEvent = immutable operational timeline
+Phases: core fleet/rides (1), routing (2), ops (3–4), fuel/maintenance (5), analytics uses these aggregates.
 """
 from django.conf import settings
 from django.db import models
@@ -247,6 +243,91 @@ class VehicleDocument(models.Model):
         return f"{self.title} — {self.vehicle.registration_number}"
 
 
+class MaintenanceType(models.TextChoices):
+    OIL_CHANGE = "oil_change", "Oil change"
+    SERVICE = "service", "Service"
+    REPAIR = "repair", "Repair"
+    INSPECTION = "inspection", "Inspection"
+    OTHER = "other", "Other"
+
+
+class FuelEntry(models.Model):
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name="fuel_entries")
+    date = models.DateField(default=timezone.localdate)
+    station = models.CharField(max_length=120, blank=True)
+    litres = models.DecimalField(max_digits=10, decimal_places=2)
+    price_per_litre = models.DecimalField(max_digits=12, decimal_places=2)
+    total = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Defaults to litres × price_per_litre when blank.",
+    )
+    odometer_km = models.PositiveIntegerField(null=True, blank=True, verbose_name="Odometer (km)")
+    driver = models.ForeignKey(
+        Driver,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fuel_entries",
+    )
+    receipt = models.FileField(upload_to="transport/fuel/%Y/%m/", blank=True, null=True)
+    notes = models.TextField(blank=True)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fuel_entries_recorded",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        verbose_name_plural = "fuel entries"
+
+    def __str__(self):
+        return f"{self.vehicle.registration_number} — {self.date} ({self.litres} L)"
+
+    def save(self, *args, **kwargs):
+        if self.total is None and self.litres is not None and self.price_per_litre is not None:
+            self.total = self.litres * self.price_per_litre
+        super().save(*args, **kwargs)
+
+
+class MaintenanceRecord(models.Model):
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name="maintenance_records")
+    maintenance_type = models.CharField(
+        max_length=20,
+        choices=MaintenanceType.choices,
+        default=MaintenanceType.SERVICE,
+    )
+    title = models.CharField(max_length=160)
+    performed_on = models.DateField(default=timezone.localdate)
+    odometer_km = models.PositiveIntegerField(null=True, blank=True, verbose_name="Odometer (km)")
+    next_due_km = models.PositiveIntegerField(null=True, blank=True)
+    next_due_date = models.DateField(null=True, blank=True)
+    cost = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    vendor = models.CharField(max_length=120, blank=True)
+    notes = models.TextField(blank=True)
+    attachment = models.FileField(upload_to="transport/maintenance/%Y/%m/", blank=True, null=True)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="maintenance_records_recorded",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-performed_on", "-created_at"]
+
+    def __str__(self):
+        return f"{self.title} — {self.vehicle.registration_number}"
+
+
 class TransportationPolicy(models.Model):
     """Singleton-style org policy (one active row expected)."""
     name = models.CharField(max_length=80, default="Default")
@@ -260,6 +341,16 @@ class TransportationPolicy(models.Model):
     auto_start_enabled = models.BooleanField(default=False)
     auto_arrival_enabled = models.BooleanField(default=False)
     min_booking_notice_hours = models.PositiveSmallIntegerField(default=1)
+    estimated_cost_per_km = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text="Optional ₦/km used for estimated trip cost on analytics.",
+    )
+    require_cancel_reason_after_approval = models.BooleanField(
+        default=True,
+        help_text="Require a cancellation reason once a ride is past draft/submitted.",
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

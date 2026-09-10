@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Live journey · {{ ride.reference }}{% endblock %}
+{% block page_title %}{{ ride.reference }}{% endblock %}
+{% block page_subtitle %}Live journey · {{ ride.get_status_display }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  #journeyMap { height: min(55vh, 420px); border-radius: 12px; border: 1px solid rgba(0,0,0,.08); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between mb-3 flex-wrap gap-2">
+  <a href="{% url 'transport:ride_detail' ride.pk %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Ride details</a>
+  <button type="button" class="btn btn-light btn-sm" id="journeyRefresh"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="surface-card mb-3">
+      <div class="surface-card-body">
+        <div class="text-secondary small">Status</div>
+        <div class="fw-semibold mb-2"><span class="status-pill status-{{ ride.status }}">{{ ride.get_status_display }}</span></div>
+        <div class="text-secondary small">Vehicle</div>
+        <div class="fw-semibold mb-2">{{ ride.vehicle.name|default:"—" }} <span class="chip">{{ ride.vehicle.registration_number|default:"" }}</span></div>
+        <div class="text-secondary small">Driver</div>
+        <div class="fw-semibold mb-2">{% if ride.driver %}{{ ride.driver.employee.full_name }}{% else %}—{% endif %}</div>
+        <div class="text-secondary small">Origin</div>
+        <div class="fw-semibold mb-2">{{ ride.origin_label }}</div>
+        {% if my_passenger %}
+        <div class="text-secondary small">Your seat</div>
+        <div class="fw-semibold">{{ my_passenger.destination_label }}</div>
+        <div><span class="status-pill status-{{ my_passenger.status }}">{{ my_passenger.get_status_display }}</span></div>
+        {% endif %}
+        <div class="text-secondary small mt-3" id="journeyLastUpdate">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="surface-card">
+      <div class="surface-card-header"><h3 class="surface-card-title">Live map</h3></div>
+      <div class="surface-card-body pt-0"><div id="journeyMap"></div></div>
+    </div>
+  </div>
+</div>
+{{ payload_json|json_script:"journey-payload" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  const payload = JSON.parse(document.getElementById("journey-payload").textContent || "{}");
+  const defaultLat = {{ map_default_lat }};
+  const defaultLng = {{ map_default_lng }};
+  const defaultZoom = {{ map_default_zoom }};
+  const map = L.map("journeyMap").setView(
+    [payload.origin_lat || defaultLat, payload.origin_lng || defaultLng],
+    defaultZoom
+  );
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap",
+    maxZoom: 19,
+  }).addTo(map);
+
+  let vehicleMarker = null;
+  const bounds = [];
+
+  if (payload.origin_lat != null) {
+    L.marker([payload.origin_lat, payload.origin_lng]).addTo(map).bindPopup("Origin");
+    bounds.push([payload.origin_lat, payload.origin_lng]);
+  }
+  (payload.stops || []).forEach((s) => {
+    if (s.lat == null) return;
+    L.circleMarker([s.lat, s.lng], {
+      radius: 7,
+      color: s.is_completed ? "#0f766e" : "#ea580c",
+      fillOpacity: 0.8,
+    }).addTo(map).bindPopup(s.label || "Stop");
+    bounds.push([s.lat, s.lng]);
+  });
+  const geom = payload.route_geometry || {};
+  if (geom.type === "LineString" && Array.isArray(geom.coordinates) && geom.coordinates.length) {
+    const latlngs = geom.coordinates.map((c) => [c[1], c[0]]);
+    L.polyline(latlngs, { color: "#2563eb", weight: 4, opacity: 0.7 }).addTo(map);
+    latlngs.forEach((ll) => bounds.push(ll));
+  }
+
+  function setLatest(latest) {
+    const el = document.getElementById("journeyLastUpdate");
+    if (!latest) {
+      el.textContent = "Waiting for driver GPS…";
+      return;
+    }
+    if (vehicleMarker) map.removeLayer(vehicleMarker);
+    vehicleMarker = L.circleMarker([latest.lat, latest.lng], {
+      radius: 10, color: "#111a2e", fillColor: "#f5a524", fillOpacity: 1, weight: 2,
+    }).addTo(map).bindPopup("Vehicle");
+    bounds.push([latest.lat, latest.lng]);
+    el.textContent = "Last ping: " + new Date(latest.recorded_at).toLocaleString()
+      + (latest.speed_kmh != null ? " · " + latest.speed_kmh + " km/h" : "");
+  }
+
+  setLatest(payload.latest);
+  if (bounds.length) map.fitBounds(bounds, { padding: [28, 28], maxZoom: 14 });
+
+  async function refresh() {
+    try {
+      const res = await fetch("{% url 'transport:api_ride_journey' ride.pk %}", {
+        headers: { "Accept": "application/json" },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setLatest(data.latest || null);
+    } catch (e) { /* ignore */ }
+  }
+  document.getElementById("journeyRefresh").addEventListener("click", refresh);
+  setInterval(refresh, 15000);
+})();
+</script>
+{% endblock %}
